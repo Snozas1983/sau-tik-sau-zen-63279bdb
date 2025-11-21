@@ -67,8 +67,8 @@ const Index = () => {
               <div className="flex flex-col md:flex-row md:justify-between md:items-baseline gap-3">
                 <h3 className="text-2xl font-light">Imperatoriškasis Kobido veido masažas</h3>
                 <div className="flex items-baseline gap-4">
-                  <span className="text-muted-foreground font-light w-20 text-right">70 min</span>
-                  <span className="text-2xl font-light">60 €</span>
+                  <span className="text-muted-foreground font-light w-20 text-right pr-[15px]">70 min</span>
+                  <span className="text-2xl font-light pr-[5px]">60 €</span>
                 </div>
               </div>
             </div>
@@ -79,8 +79,8 @@ const Index = () => {
                 maxWidth: 'calc(100% - 50px)'
               }} className="text-2xl font-light text-left pb-0 pr-[20px]">CHIRO IQ atpalaiduojantis / stangrinantis / formuojantis / anticeliulitinis kūno masažas</h3>
                 <div className="flex items-baseline gap-4">
-                  <span className="text-muted-foreground font-light w-20 text-right">90 min</span>
-                  <span className="text-2xl font-light">80 €</span>
+                  <span className="text-muted-foreground font-light w-20 text-right pr-[12px]">90 min</span>
+                  <span className="text-2xl font-light pr-[10px]">80€</span>
                 </div>
               </div>
             </div>
