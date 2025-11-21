@@ -27,7 +27,7 @@ const Index = () => {
           
           <div className="h-px w-24 mx-auto bg-border" />
           
-          <p className="text-lg md:text-xl font-light leading-relaxed text-muted-foreground max-w-xl mx-auto">
+          <p className="text-lg md:text-xl font-light leading-relaxed text-foreground max-w-xl mx-auto">
             Minimalistinio japoniško stiliaus masažo erdvė Domeikavoje
           </p>
           
