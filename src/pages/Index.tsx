@@ -110,6 +110,9 @@ const Index = () => {
               makiažo meistrais bei kurti savo kosmetikos produktų liniją.
             </p>
             <p className="text-lg font-light leading-relaxed text-muted-foreground">
+              Kūno aparatinis masažas (vinrosferos)
+            </p>
+            <p className="text-lg font-light leading-relaxed text-muted-foreground">
               Stebėkite naujienas ir būkite kartu su mumis šioje kelionėje.
             </p>
           </div>
