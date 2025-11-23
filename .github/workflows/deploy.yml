@@ -24,11 +24,11 @@ jobs:
       - name: Build project
         run: npm run build
 
-      - name: Deploy dist to Hostinger via FTP
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
+      - name: FTP-Deploy-Action
+        uses: SamKirkland/FTP-Deploy-Action@v4
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          local-dir: dist/
           server-dir: /
+          local-dir: dist/
