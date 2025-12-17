@@ -24,15 +24,15 @@ export const ServiceSelector = ({
             'focus:outline-none'
           )}
         >
-          <div className="flex flex-col md:flex-row md:justify-between md:items-baseline gap-2 md:gap-3">
-            <h3 className="text-lg md:text-2xl font-light text-booking-foreground transition-all duration-200 group-hover:font-semibold">
+          <div className="flex flex-col gap-2 md:gap-3">
+            <h3 className="text-base md:text-2xl font-light text-booking-foreground transition-all duration-200 group-hover:font-semibold leading-relaxed break-words">
               {service.name}
             </h3>
-            <div className="flex items-baseline gap-4">
-              <span className="text-booking-muted font-light w-20 text-right pr-[15px] text-sm md:text-base">
+            <div className="flex items-baseline gap-4 md:justify-end">
+              <span className="text-booking-muted font-light text-sm md:text-base">
                 {service.duration} min
               </span>
-              <span className="text-lg md:text-2xl font-light text-booking-foreground pr-[5px]">
+              <span className="text-base md:text-2xl font-light text-booking-foreground">
                 {service.price} €
               </span>
             </div>
