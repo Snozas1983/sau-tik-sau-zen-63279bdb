@@ -25,7 +25,7 @@ export const ServiceSelector = ({
           )}
         >
           <div className="flex flex-col md:flex-row md:justify-between md:items-baseline gap-3">
-            <h3 className="text-2xl font-light text-booking-foreground transition-all duration-200 group-hover:font-medium">
+            <h3 className="text-2xl font-light text-booking-foreground transition-all duration-200 group-hover:font-semibold">
               {service.name}
             </h3>
             <div className="flex items-baseline gap-4">
