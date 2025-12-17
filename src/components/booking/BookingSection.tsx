@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { format } from 'date-fns';
 import { Service, TimeSlot, BookingStep, CustomerFormData, DayAvailability } from './types';
 import { services, generateMockAvailability } from './mockData';
-import { ServiceSelector } from './ServiceSelector';
+
 import { BookingCalendar } from './BookingCalendar';
 import { TimeSlotSelector } from './TimeSlotSelector';
 import { BookingForm } from './BookingForm';
@@ -83,81 +83,89 @@ export const BookingSection = () => {
   };
 
   return (
-    <div className="relative">
-        {/* Step 1: Service Selection */}
-        <div
-          className={cn(
-            'transition-all duration-300',
-            step === 'service'
-              ? 'opacity-100 translate-y-0'
-              : 'opacity-0 absolute inset-0 pointer-events-none -translate-y-4'
-          )}
-        >
-          <ServiceSelector
-            services={services}
-            selectedService={selectedService}
-            onSelectService={handleSelectService}
-          />
-        </div>
+    <div className="space-y-12">
+      {/* Services List - Always visible */}
+      {services.map((service, index) => {
+        const isSelected = selectedService?.id === service.id;
+        const showCalendarHere = isSelected && step !== 'service';
+        
+        return (
+          <div key={service.id} className={cn(
+            index < services.length - 1 && 'border-b border-booking-border pb-12'
+          )}>
+            {/* Service Row */}
+            <button
+              onClick={() => {
+                if (step === 'service') {
+                  handleSelectService(service);
+                } else if (isSelected) {
+                  // Already selected, clicking again goes back to service selection
+                  handleBackToService();
+                } else {
+                  // Switch to different service
+                  handleSelectService(service);
+                }
+              }}
+              className={cn(
+                'w-full text-left transition-all duration-200',
+                'hover:opacity-70 focus:outline-none',
+                isSelected && step !== 'service' && 'mb-6'
+              )}
+            >
+              <div className="flex flex-col md:flex-row md:justify-between md:items-baseline gap-3">
+                <h3 className="text-2xl font-light text-booking-foreground">
+                  {service.name}
+                </h3>
+                <div className="flex items-baseline gap-4">
+                  <span className="text-booking-muted font-light w-20 text-right pr-[15px]">
+                    {service.duration} min
+                  </span>
+                  <span className="text-2xl font-light text-booking-foreground pr-[5px]">
+                    {service.price} €
+                  </span>
+                </div>
+              </div>
+            </button>
 
-        {/* Step 2: Calendar */}
-        <div
-          className={cn(
-            'transition-all duration-300',
-            step === 'calendar'
-              ? 'opacity-100 translate-y-0'
-              : 'opacity-0 absolute inset-0 pointer-events-none -translate-y-4'
-          )}
-        >
-          {selectedService && (
-            <BookingCalendar
-              availability={availability}
-              selectedDate={selectedDate}
-              onSelectDate={handleSelectDate}
-              onBack={handleBackToService}
-            />
-          )}
-        </div>
+            {/* Calendar, Time, Form - Expands below selected service */}
+            {showCalendarHere && (
+              <div className="mt-6 animate-fade-in">
+                {/* Calendar */}
+                {step === 'calendar' && (
+                  <BookingCalendar
+                    availability={availability}
+                    selectedDate={selectedDate}
+                    onSelectDate={handleSelectDate}
+                    onBack={handleBackToService}
+                  />
+                )}
 
-        {/* Step 3: Time Slots */}
-        <div
-          className={cn(
-            'transition-all duration-300',
-            step === 'time'
-              ? 'opacity-100 translate-y-0'
-              : 'opacity-0 absolute inset-0 pointer-events-none -translate-y-4'
-          )}
-        >
-          {selectedService && selectedDate && (
-            <TimeSlotSelector
-              date={selectedDate}
-              slots={getAvailableSlotsForDate(selectedDate)}
-              selectedSlot={selectedTimeSlot}
-              onSelectSlot={handleSelectTimeSlot}
-              onBack={handleBackToCalendar}
-            />
-          )}
-        </div>
+                {/* Time Slots */}
+                {step === 'time' && selectedDate && (
+                  <TimeSlotSelector
+                    date={selectedDate}
+                    slots={getAvailableSlotsForDate(selectedDate)}
+                    selectedSlot={selectedTimeSlot}
+                    onSelectSlot={handleSelectTimeSlot}
+                    onBack={handleBackToCalendar}
+                  />
+                )}
 
-        {/* Step 4: Booking Form */}
-        <div
-          className={cn(
-            'transition-all duration-300',
-            step === 'form'
-              ? 'opacity-100 translate-y-0'
-              : 'opacity-0 absolute inset-0 pointer-events-none -translate-y-4'
-          )}
-        >
-          {selectedService && selectedDate && selectedTimeSlot && (
-            <BookingForm
-              service={selectedService}
-              date={selectedDate}
-              timeSlot={selectedTimeSlot}
-              onBack={handleBackToTime}
-              onSubmit={handleSubmitBooking}
-            />
-          )}
-      </div>
+                {/* Booking Form */}
+                {step === 'form' && selectedDate && selectedTimeSlot && (
+                  <BookingForm
+                    service={selectedService}
+                    date={selectedDate}
+                    timeSlot={selectedTimeSlot}
+                    onBack={handleBackToTime}
+                    onSubmit={handleSubmitBooking}
+                  />
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 };

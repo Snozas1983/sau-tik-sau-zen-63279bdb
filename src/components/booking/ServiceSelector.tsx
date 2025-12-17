@@ -13,40 +13,32 @@ export const ServiceSelector = ({
   onSelectService,
 }: ServiceSelectorProps) => {
   return (
-    <div className="space-y-4">
-      <h3 className="text-xl font-light text-booking-foreground text-center mb-8">
-        Pasirinkite paslaugą
-      </h3>
-      <div className="grid gap-4">
-        {services.map((service) => (
-          <button
-            key={service.id}
-            onClick={() => onSelectService(service)}
-            className={cn(
-              'w-full p-6 text-left rounded-sm border transition-all duration-300',
-              'hover:border-booking-available/50 hover:bg-booking-surface/50',
-              'focus:outline-none focus:ring-2 focus:ring-booking-available/30',
-              selectedService?.id === service.id
-                ? 'border-booking-available bg-booking-surface'
-                : 'border-booking-border bg-transparent'
-            )}
-          >
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-              <h4 className="text-lg font-light text-booking-foreground">
-                {service.name}
-              </h4>
-              <div className="flex items-center gap-4">
-                <span className="text-sm text-booking-muted">
-                  {service.duration} min
-                </span>
-                <span className="text-xl font-light text-booking-foreground">
-                  {service.price} €
-                </span>
-              </div>
+    <div className="space-y-12">
+      {services.map((service, index) => (
+        <button
+          key={service.id}
+          onClick={() => onSelectService(service)}
+          className={cn(
+            'w-full text-left pb-12 transition-all duration-200',
+            index < services.length - 1 && 'border-b border-booking-border',
+            'hover:opacity-70 focus:outline-none'
+          )}
+        >
+          <div className="flex flex-col md:flex-row md:justify-between md:items-baseline gap-3">
+            <h3 className="text-2xl font-light text-booking-foreground">
+              {service.name}
+            </h3>
+            <div className="flex items-baseline gap-4">
+              <span className="text-booking-muted font-light w-20 text-right pr-[15px]">
+                {service.duration} min
+              </span>
+              <span className="text-2xl font-light text-booking-foreground pr-[5px]">
+                {service.price} €
+              </span>
             </div>
-          </button>
-        ))}
-      </div>
+          </div>
+        </button>
+      ))}
     </div>
   );
 };
