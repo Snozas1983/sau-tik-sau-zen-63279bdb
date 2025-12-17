@@ -73,8 +73,10 @@ export const BookingCalendar = ({
     return getSlotCount(date) > 0;
   };
 
+  const todayHasSlots = getSlotCount(today) > 0;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <button
         onClick={onBack}
         className="text-sm text-booking-muted hover:text-booking-foreground transition-colors flex items-center gap-1"
@@ -83,41 +85,41 @@ export const BookingCalendar = ({
         Grįžti atgal
       </button>
 
-      <div className="bg-booking-surface rounded-sm p-6">
+      <div className="bg-booking-surface rounded-sm p-3">
         {/* Month Navigation */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-3">
           <button
             onClick={() => canGoPrev && setCurrentMonth(subMonths(currentMonth, 1))}
             disabled={!canGoPrev}
             className={cn(
-              'p-2 rounded-sm transition-colors',
+              'p-1 rounded-sm transition-colors',
               canGoPrev
                 ? 'hover:bg-booking-border text-booking-foreground'
                 : 'text-booking-muted/30 cursor-not-allowed'
             )}
             aria-label="Ankstesnis mėnuo"
           >
-            <ChevronLeft size={20} />
+            <ChevronLeft size={16} />
           </button>
-          <h4 className="text-lg font-light text-booking-foreground capitalize">
+          <h4 className="text-sm font-light text-booking-foreground capitalize">
             {format(currentMonth, 'LLLL yyyy', { locale: lt })}
           </h4>
           <button
             onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-            className="p-2 rounded-sm hover:bg-booking-border text-booking-foreground transition-colors"
+            className="p-1 rounded-sm hover:bg-booking-border text-booking-foreground transition-colors"
             aria-label="Kitas mėnuo"
           >
-            <ChevronRight size={20} />
+            <ChevronRight size={16} />
           </button>
         </div>
 
         {/* Weekday Headers */}
-        <div className="grid grid-cols-7 gap-1 mb-2">
+        <div className="grid grid-cols-7 gap-0.5 mb-1">
           {WEEKDAYS.map((day, index) => (
             <div
               key={day}
               className={cn(
-                'text-center text-sm py-2 font-light',
+                'text-center text-xs py-1 font-light',
                 index === 6 ? 'text-booking-muted/50' : 'text-booking-muted'
               )}
             >
@@ -127,7 +129,7 @@ export const BookingCalendar = ({
         </div>
 
         {/* Calendar Grid */}
-        <div className="grid grid-cols-7 gap-1">
+        <div className="grid grid-cols-7 gap-0.5">
           {calendarDays.map((date, index) => {
             const isCurrentMonth = isSameMonth(date, currentMonth);
             const isToday = isSameDay(date, today);
@@ -136,6 +138,10 @@ export const BookingCalendar = ({
             const isSundayDay = isSunday(date);
             const slotCount = getSlotCount(date);
             const isClickable = isDateClickable(date);
+            const hasAvailableSlots = slotCount > 0;
+
+            // Today should be greyed out if no slots available
+            const isTodayNoSlots = isToday && !todayHasSlots;
 
             return (
               <button
@@ -143,39 +149,28 @@ export const BookingCalendar = ({
                 onClick={() => isClickable && onSelectDate(date)}
                 disabled={!isClickable}
                 className={cn(
-                  'aspect-square flex flex-col items-center justify-center rounded-sm transition-all duration-200 relative',
-                  'min-h-[44px]',
+                  'aspect-square flex items-center justify-center rounded-sm transition-all duration-200',
+                  'min-h-[28px] text-xs',
                   !isCurrentMonth && 'opacity-30',
-                  isPast && 'opacity-30 cursor-not-allowed',
+                  (isPast || isTodayNoSlots) && 'opacity-30 cursor-not-allowed',
                   isSundayDay && !isPast && 'opacity-40 cursor-not-allowed',
                   isClickable && 'hover:bg-booking-available/10 cursor-pointer',
-                  isSelected && 'bg-booking-available/20',
-                  isToday && 'ring-1 ring-booking-available/50',
-                  !isClickable && !isPast && !isSundayDay && isCurrentMonth && 'text-booking-muted/60'
+                  isSelected && 'bg-booking-available/20 ring-1 ring-booking-available',
+                  !isClickable && !isPast && !isSundayDay && isCurrentMonth && !isTodayNoSlots && 'text-booking-muted/60'
                 )}
               >
                 <span
                   className={cn(
-                    'text-sm font-light',
-                    isSelected ? 'text-booking-available' : 'text-booking-foreground'
+                    hasAvailableSlots && isCurrentMonth && !isPast && !isSundayDay
+                      ? 'font-bold text-booking-foreground'
+                      : 'font-light text-booking-muted'
                   )}
                 >
                   {format(date, 'd')}
                 </span>
-                {slotCount > 0 && isCurrentMonth && !isPast && !isSundayDay && (
-                  <span className="absolute bottom-1 w-1.5 h-1.5 rounded-full bg-booking-available" />
-                )}
               </button>
             );
           })}
-        </div>
-
-        {/* Legend */}
-        <div className="mt-6 pt-4 border-t border-booking-border flex items-center justify-center gap-6 text-xs text-booking-muted">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-booking-available" />
-            <span>Yra laisvų laikų</span>
-          </div>
         </div>
       </div>
     </div>
