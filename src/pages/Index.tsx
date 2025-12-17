@@ -57,41 +57,14 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Services Section */}
-      <section className="py-32 px-6 border-t border-border">
+      {/* Services & Booking Section */}
+      <section className="py-32 px-6 border-t border-border bg-booking-bg">
         <div className="max-w-3xl mx-auto">
-          <h2 className="text-3xl md:text-4xl font-light text-center mb-16 tracking-wide">
+          <h2 className="text-3xl md:text-4xl font-light text-center mb-16 tracking-wide text-booking-foreground">
             Paslaugos
           </h2>
-          <div className="space-y-12">
-            <div className="space-y-4 pb-12 border-b border-border">
-              <div className="flex flex-col md:flex-row md:justify-between md:items-baseline gap-3">
-                <h3 className="text-2xl font-light">Imperatoriškasis Kobido veido masažas</h3>
-                <div className="flex items-baseline gap-4">
-                  <span className="text-muted-foreground font-light w-20 text-right pr-[15px]">70 min</span>
-                  <span className="text-2xl font-light pr-[5px]">60 €</span>
-                </div>
-              </div>
-            </div>
-            
-            <div className="space-y-4 pb-12 border-b border-border">
-              <div className="flex flex-col md:flex-row md:justify-between md:items-baseline gap-3">
-                <h3 style={{
-                maxWidth: 'calc(100% - 50px)'
-              }} className="text-2xl font-light text-left pb-0 pr-[20px]">CHIRO IQ atpalaiduojantis / stangrinantis / formuojantis / anticeliulitinis kūno masažas</h3>
-                <div className="flex items-baseline gap-4">
-                  <span className="text-muted-foreground font-light w-20 text-right pr-[12px]">90 min</span>
-                  <span className="text-2xl font-light pr-[10px]">80€</span>
-                </div>
-              </div>
-            </div>
-          </div>
+          <BookingSection />
         </div>
-      </section>
-
-      {/* Booking Section */}
-      <section id="booking" className="py-32 px-6 border-t border-border bg-booking-bg">
-        <BookingSection />
       </section>
 
       {/* Future Plans Section */}

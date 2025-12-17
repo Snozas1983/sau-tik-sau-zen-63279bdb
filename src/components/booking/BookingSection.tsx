@@ -83,12 +83,7 @@ export const BookingSection = () => {
   };
 
   return (
-    <div className="max-w-3xl mx-auto">
-      <h2 className="text-3xl md:text-4xl font-light text-center mb-16 tracking-wide text-booking-foreground">
-        Rezervacija
-      </h2>
-
-      <div className="relative">
+    <div className="relative">
         {/* Step 1: Service Selection */}
         <div
           className={cn(
@@ -162,7 +157,6 @@ export const BookingSection = () => {
               onSubmit={handleSubmitBooking}
             />
           )}
-        </div>
       </div>
     </div>
   );
