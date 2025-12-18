@@ -113,14 +113,14 @@ export const BookingSection = () => {
               )}
             >
               <div className="flex flex-col md:flex-row md:justify-between md:items-baseline gap-3">
-                <h3 className="text-2xl font-light text-booking-foreground">
+                <h3 className="text-2xl font-light text-booking-foreground flex-1 md:max-w-[50%]">
                   {service.name}
                 </h3>
-                <div className="flex items-baseline gap-4">
-                  <span className="text-booking-muted font-light w-20 text-right pr-[15px]">
+                <div className="flex items-baseline gap-6 shrink-0">
+                  <span className="text-booking-muted font-light w-[80px] text-right whitespace-nowrap">
                     {service.duration} min
                   </span>
-                  <span className="text-2xl font-light text-booking-foreground pr-[5px]">
+                  <span className="text-2xl font-light text-booking-foreground w-[80px] text-right whitespace-nowrap">
                     {service.price} €
                   </span>
                 </div>
