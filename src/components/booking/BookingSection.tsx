@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
 import { format } from 'date-fns';
-import { Service, TimeSlot, BookingStep, CustomerFormData, DayAvailability } from './types';
-import { services, generateMockAvailability } from './mockData';
+import { TimeSlot, BookingStep, CustomerFormData } from './types';
+import { generateMockAvailability } from './mockData';
+import { useServices, Service } from '@/hooks/useServices';
 
 import { BookingCalendar } from './BookingCalendar';
 import { TimeSlotSelector } from './TimeSlotSelector';
@@ -10,6 +11,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
 export const BookingSection = () => {
+  const { data: services = [], isLoading, error } = useServices();
   const [step, setStep] = useState<BookingStep>('service');
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -82,16 +84,26 @@ export const BookingSection = () => {
     setSelectedTimeSlot(null);
   };
 
+  if (isLoading) {
+    return <div className="text-center py-12 text-booking-muted">Kraunama...</div>;
+  }
+
+  if (error) {
+    return <div className="text-center py-12 text-destructive">Klaida kraunant paslaugas</div>;
+  }
+
+  const activeServices = services.filter(s => s.isActive);
+
   return (
     <div className="space-y-12">
       {/* Services List - Always visible */}
-      {services.map((service, index) => {
+      {activeServices.map((service, index) => {
         const isSelected = selectedService?.id === service.id;
         const showCalendarHere = isSelected && step !== 'service';
         
         return (
           <div key={service.id} className={cn(
-            index < services.length - 1 && 'border-b border-booking-border pb-12'
+            index < activeServices.length - 1 && 'border-b border-booking-border pb-12'
           )}>
             {/* Service Row */}
             <button
