@@ -9,6 +9,9 @@ const AIRTABLE_API_URL = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}`;
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
+// Initialize Supabase admin client
+const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-admin-password',
@@ -72,13 +75,24 @@ serve(async (req) => {
 
     // GET /services - Get active services
     if (path === '/services' && req.method === 'GET') {
-      const data = await airtableRequest('/Services?filterByFormula={Active?}=TRUE()');
-      const services = data.records.map((record: any) => ({
+      // Fetch from Supabase instead of Airtable (synced data)
+      const { data, error } = await supabaseAdmin
+        .from('services')
+        .select('*')
+        .eq('is_active', true)
+        .order('name');
+      
+      if (error) {
+        console.error('Error fetching services from Supabase:', error);
+        throw error;
+      }
+      
+      const services = data.map((record: any) => ({
         id: record.id,
-        name: record.fields['Service name'],
-        duration: record.fields['Duration (minutes)'],
-        price: record.fields['Regular price (EUR)'],
-        isActive: record.fields['Active?'],
+        name: record.name,
+        duration: record.duration,
+        price: record.price,
+        isActive: record.is_active,
       }));
       
       return new Response(JSON.stringify({ services }), {
