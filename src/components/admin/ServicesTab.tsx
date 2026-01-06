@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, RefreshCw, Check, X } from 'lucide-react';
+import { Plus, Trash2, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
@@ -23,7 +23,6 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useAdminServices, AdminService, ServiceFormData } from '@/hooks/useAdminServices';
-import { airtableApi } from '@/lib/airtable';
 
 interface ServicesTabProps {
   adminPassword: string;
@@ -65,7 +64,6 @@ export function ServicesTab({ adminPassword }: ServicesTabProps) {
   const [newRow, setNewRow] = useState<EditableRow | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [serviceToDelete, setServiceToDelete] = useState<AdminService | null>(null);
-  const [isSyncing, setIsSyncing] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
 
   // Set default sortOrder for new row based on existing services
@@ -126,7 +124,7 @@ export function ServicesTab({ adminPassword }: ServicesTabProps) {
         description: editedRow.description,
         sortOrder: editedRow.sortOrder,
       });
-      toast.success('Paslauga atnaujinta');
+      toast.success('Paslauga atnaujinta ir sinchronizuota');
       setEditingRows(prev => {
         const next = { ...prev };
         delete next[id];
@@ -157,7 +155,7 @@ export function ServicesTab({ adminPassword }: ServicesTabProps) {
         description: newRow.description,
         sortOrder: newRow.sortOrder,
       });
-      toast.success('Paslauga sukurta');
+      toast.success('Paslauga sukurta ir sinchronizuota');
       const maxSort = services.length > 0 ? Math.max(...services.map(s => s.sortOrder)) + 2 : 1;
       setNewRow({ ...emptyRow, sortOrder: maxSort });
     } catch (error) {
@@ -191,30 +189,12 @@ export function ServicesTab({ adminPassword }: ServicesTabProps) {
 
     try {
       await deleteService(serviceToDelete.id);
-      toast.success('Paslauga ištrinta');
+      toast.success('Paslauga ištrinta ir sinchronizuota');
       setDeleteDialogOpen(false);
       setServiceToDelete(null);
     } catch (error) {
       const message = error instanceof Error ? error.message : '';
       toast.error(message ? `Klaida: ${message}` : 'Nepavyko ištrinti');
-    }
-  };
-
-  const handleSync = async () => {
-    setIsSyncing(true);
-    try {
-      const result = await airtableApi(
-        '/admin/sync-services',
-        { method: 'POST' },
-        adminPassword
-      );
-      toast.success(`Sinchronizuota: ${result.synced ?? 0} paslaugos`);
-      refetch();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : '';
-      toast.error(message ? `Klaida: ${message}` : 'Nepavyko sinchronizuoti');
-    } finally {
-      setIsSyncing(false);
     }
   };
 
@@ -265,15 +245,6 @@ export function ServicesTab({ adminPassword }: ServicesTabProps) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-medium">Paslaugos</h2>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleSync}
-          disabled={isSyncing}
-        >
-          <RefreshCw className={`w-4 h-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
-          Sync Airtable
-        </Button>
       </div>
 
       {/* Inline Editable Table */}

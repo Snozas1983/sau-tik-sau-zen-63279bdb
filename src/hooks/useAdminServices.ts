@@ -27,6 +27,14 @@ export interface ServiceFormData {
 export function useAdminServices(adminPassword: string) {
   const queryClient = useQueryClient();
 
+  const syncToSupabase = async () => {
+    try {
+      await airtableApi('/admin/sync-services', { method: 'POST' }, adminPassword);
+    } catch (error) {
+      console.error('Auto-sync failed:', error);
+    }
+  };
+
   const servicesQuery = useQuery({
     queryKey: ['admin-services', adminPassword],
     queryFn: async () => {
@@ -47,8 +55,9 @@ export function useAdminServices(adminPassword: string) {
         adminPassword
       );
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ['admin-services'] });
+      await syncToSupabase();
     },
   });
 
@@ -63,8 +72,9 @@ export function useAdminServices(adminPassword: string) {
         adminPassword
       );
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ['admin-services'] });
+      await syncToSupabase();
     },
   });
 
@@ -78,8 +88,9 @@ export function useAdminServices(adminPassword: string) {
         adminPassword
       );
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ['admin-services'] });
+      await syncToSupabase();
     },
   });
 
