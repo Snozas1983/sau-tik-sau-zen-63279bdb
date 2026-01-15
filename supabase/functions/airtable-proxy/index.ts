@@ -321,28 +321,24 @@ serve(async (req) => {
         .single();
 
       // Send notifications asynchronously (don't wait for response)
-      const supabaseUrl = Deno.env.get('SUPABASE_URL');
-      const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
-      
-      if (supabaseUrl && supabaseAnonKey) {
-        fetch(`${supabaseUrl}/functions/v1/send-notifications`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${supabaseAnonKey}`,
-          },
-          body: JSON.stringify({
-            bookingId: data.records[0].id,
-            serviceName: serviceData?.name || 'Masažas',
-            date: body.date,
-            startTime: body.startTime,
-            endTime: body.endTime,
-            customerName: body.customerName,
-            customerPhone: body.customerPhone,
-            customerEmail: body.customerEmail,
-          }),
-        }).catch(err => console.error('Failed to send notifications:', err));
-      }
+      // Use the already-defined SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY from top of file
+      fetch(`${SUPABASE_URL}/functions/v1/send-notifications`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        },
+        body: JSON.stringify({
+          bookingId: data.records[0].id,
+          serviceName: serviceData?.name || 'Masažas',
+          date: body.date,
+          startTime: body.startTime,
+          endTime: body.endTime,
+          customerName: body.customerName,
+          customerPhone: body.customerPhone,
+          customerEmail: body.customerEmail,
+        }),
+      }).catch(err => console.error('Failed to send notifications:', err));
       
       return new Response(JSON.stringify({ success: true, booking: data.records[0] }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
