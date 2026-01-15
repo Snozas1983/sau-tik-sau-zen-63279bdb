@@ -104,25 +104,24 @@ export function ExceptionDialog({
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
-      for (const interval of intervals) {
-        const payload: Record<string, any> = {
-          start_time: interval.startTime,
-          end_time: interval.endTime,
+      const isEditing = !!existingException;
+      
+      if (isEditing) {
+        // Update existing exception
+        const payload = {
+          start_time: intervals[0].startTime,
+          end_time: intervals[0].endTime,
           exception_type: exceptionType,
           is_recurring: isRecurring,
           description: description || null,
+          date: isRecurring ? null : format(selectedDate, 'yyyy-MM-dd'),
+          day_of_week: isRecurring ? dayOfWeek : null,
         };
 
-        if (isRecurring) {
-          payload.day_of_week = dayOfWeek;
-        } else {
-          payload.date = format(selectedDate, 'yyyy-MM-dd');
-        }
-
         const response = await fetch(
-          `${supabaseUrl}/functions/v1/airtable-proxy/admin/exceptions`,
+          `${supabaseUrl}/functions/v1/airtable-proxy/admin/exceptions/${existingException.id}`,
           {
-            method: 'POST',
+            method: 'PUT',
             headers: {
               'Content-Type': 'application/json',
               'x-admin-password': adminPassword,
@@ -132,16 +131,52 @@ export function ExceptionDialog({
         );
 
         if (!response.ok) {
-          throw new Error('Failed to create exception');
+          throw new Error('Failed to update exception');
         }
-      }
+        
+        toast.success('Išimtis atnaujinta');
+      } else {
+        // Create new exception(s)
+        for (const interval of intervals) {
+          const payload: Record<string, any> = {
+            start_time: interval.startTime,
+            end_time: interval.endTime,
+            exception_type: exceptionType,
+            is_recurring: isRecurring,
+            description: description || null,
+          };
 
-      toast.success('Išimtis sukurta');
+          if (isRecurring) {
+            payload.day_of_week = dayOfWeek;
+          } else {
+            payload.date = format(selectedDate, 'yyyy-MM-dd');
+          }
+
+          const response = await fetch(
+            `${supabaseUrl}/functions/v1/airtable-proxy/admin/exceptions`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-admin-password': adminPassword,
+              },
+              body: JSON.stringify(payload),
+            }
+          );
+
+          if (!response.ok) {
+            throw new Error('Failed to create exception');
+          }
+        }
+        
+        toast.success('Išimtis sukurta');
+      }
+      
       onExceptionCreated();
       handleClose();
     } catch (err) {
-      console.error('Error creating exception:', err);
-      toast.error('Klaida kuriant išimtį');
+      console.error('Error saving exception:', err);
+      toast.error(existingException ? 'Klaida atnaujinant išimtį' : 'Klaida kuriant išimtį');
     } finally {
       setIsSubmitting(false);
     }
@@ -155,15 +190,15 @@ export function ExceptionDialog({
     onClose();
   };
 
-  const isViewingExisting = !!existingException;
+  const isEditing = !!existingException;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {isViewingExisting 
-              ? 'Išimties detalės' 
+            {isEditing 
+              ? 'Redaguoti išimtį' 
               : (isWeekend ? 'Leisti registraciją' : 'Blokuoti laiką')}
           </DialogTitle>
           <DialogDescription>
@@ -172,8 +207,8 @@ export function ExceptionDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {/* Full day toggle (only for blocking, and only for new exceptions) */}
-          {!isWeekend && !isViewingExisting && (
+          {/* Full day toggle (only for blocking) */}
+          {!isWeekend && (
             <div className="flex items-center justify-between">
               <Label htmlFor="full-day">Visa diena</Label>
               <Switch
@@ -185,7 +220,7 @@ export function ExceptionDialog({
           )}
 
           {/* Time intervals */}
-          {((!isFullDay || isWeekend) || isViewingExisting) && (
+          {(!isFullDay || isWeekend) && (
             <div className="space-y-3">
               <Label>Laiko intervalai</Label>
               {intervals.map((interval) => (
@@ -195,7 +230,6 @@ export function ExceptionDialog({
                     onChange={(value) =>
                       handleIntervalChange(interval.id, 'startTime', value)
                     }
-                    disabled={isViewingExisting}
                   />
                   <span className="text-muted-foreground">-</span>
                   <TimeInput
@@ -203,9 +237,8 @@ export function ExceptionDialog({
                     onChange={(value) =>
                       handleIntervalChange(interval.id, 'endTime', value)
                     }
-                    disabled={isViewingExisting}
                   />
-                  {intervals.length > 1 && !isViewingExisting && (
+                  {intervals.length > 1 && !isEditing && (
                     <Button
                       variant="ghost"
                       size="icon"
@@ -216,7 +249,7 @@ export function ExceptionDialog({
                   )}
                 </div>
               ))}
-              {!isViewingExisting && (
+              {!isEditing && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -231,52 +264,41 @@ export function ExceptionDialog({
           )}
 
           {/* Recurring toggle */}
-          {!isViewingExisting && (
-            <div className="flex items-start gap-3 pt-2">
-              <Checkbox
-                id="recurring"
-                checked={isRecurring}
-                onCheckedChange={(checked) => setIsRecurring(checked === true)}
-              />
-              <div className="grid gap-1.5 leading-none">
-                <Label htmlFor="recurring" className="cursor-pointer">
-                  Kartoti kiekvieną savaitę
-                </Label>
-                <p className="text-sm text-muted-foreground">
-                  Ši išimtis bus taikoma kiekvieną {dayNames[dayOfWeek].toLowerCase()}
-                </p>
-              </div>
+          <div className="flex items-start gap-3 pt-2">
+            <Checkbox
+              id="recurring"
+              checked={isRecurring}
+              onCheckedChange={(checked) => setIsRecurring(checked === true)}
+            />
+            <div className="grid gap-1.5 leading-none">
+              <Label htmlFor="recurring" className="cursor-pointer">
+                Kartoti kiekvieną savaitę
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                Ši išimtis bus taikoma kiekvieną {dayNames[dayOfWeek].toLowerCase()}
+              </p>
             </div>
-          )}
-          
-          {isViewingExisting && isRecurring && (
-            <p className="text-sm text-muted-foreground">
-              ✓ Kartojama kiekvieną {dayNames[dayOfWeek].toLowerCase()}
-            </p>
-          )}
+          </div>
 
           {/* Description */}
           <div className="space-y-2">
-            <Label htmlFor="description">Aprašymas {!isViewingExisting && '(neprivaloma)'}</Label>
+            <Label htmlFor="description">Aprašymas (neprivaloma)</Label>
             <Input
               id="description"
               placeholder="Pvz.: Atostogos, Pietų pertrauka..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              disabled={isViewingExisting}
             />
           </div>
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={handleClose}>
-            {isViewingExisting ? 'Uždaryti' : 'Atšaukti'}
+            Atšaukti
           </Button>
-          {!isViewingExisting && (
-            <Button onClick={handleSubmit} disabled={isSubmitting}>
-              {isSubmitting ? 'Saugoma...' : 'Sukurti'}
-            </Button>
-          )}
+          <Button onClick={handleSubmit} disabled={isSubmitting}>
+            {isSubmitting ? 'Saugoma...' : (isEditing ? 'Išsaugoti' : 'Sukurti')}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

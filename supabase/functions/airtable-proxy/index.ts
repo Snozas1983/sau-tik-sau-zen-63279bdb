@@ -134,6 +134,54 @@ serve(async (req) => {
         throw bookingsError;
       }
       
+      // 4. Get schedule exceptions
+      const { data: exceptionsData, error: exceptionsError } = await supabaseAdmin
+        .from('schedule_exceptions')
+        .select('*');
+      
+      if (exceptionsError) {
+        console.error('Error fetching exceptions:', exceptionsError);
+        throw exceptionsError;
+      }
+      
+      // Group exceptions by date and day of week
+      const blockExceptionsByDate = new Map<string, Array<{ startTime: string; endTime: string }>>();
+      const blockExceptionsByDayOfWeek = new Map<number, Array<{ startTime: string; endTime: string }>>();
+      const allowExceptionsByDate = new Map<string, Array<{ startTime: string; endTime: string }>>();
+      const allowExceptionsByDayOfWeek = new Map<number, Array<{ startTime: string; endTime: string }>>();
+      
+      for (const ex of exceptionsData || []) {
+        const startTime = ex.start_time?.substring(0, 5);
+        const endTime = ex.end_time?.substring(0, 5);
+        const interval = { startTime, endTime };
+        
+        if (ex.exception_type === 'block') {
+          if (ex.is_recurring && ex.day_of_week !== null) {
+            if (!blockExceptionsByDayOfWeek.has(ex.day_of_week)) {
+              blockExceptionsByDayOfWeek.set(ex.day_of_week, []);
+            }
+            blockExceptionsByDayOfWeek.get(ex.day_of_week)!.push(interval);
+          } else if (ex.date) {
+            if (!blockExceptionsByDate.has(ex.date)) {
+              blockExceptionsByDate.set(ex.date, []);
+            }
+            blockExceptionsByDate.get(ex.date)!.push(interval);
+          }
+        } else if (ex.exception_type === 'allow') {
+          if (ex.is_recurring && ex.day_of_week !== null) {
+            if (!allowExceptionsByDayOfWeek.has(ex.day_of_week)) {
+              allowExceptionsByDayOfWeek.set(ex.day_of_week, []);
+            }
+            allowExceptionsByDayOfWeek.get(ex.day_of_week)!.push(interval);
+          } else if (ex.date) {
+            if (!allowExceptionsByDate.has(ex.date)) {
+              allowExceptionsByDate.set(ex.date, []);
+            }
+            allowExceptionsByDate.get(ex.date)!.push(interval);
+          }
+        }
+      }
+      
       // Group bookings by date
       const bookingsByDate = new Map<string, Array<{ startTime: string; endTime: string }>>();
       for (const booking of bookingsData || []) {
@@ -149,7 +197,7 @@ serve(async (req) => {
         }
       }
       
-      // 4. Generate slots for each day
+      // 5. Generate slots for each day
       const availability: Array<{ date: string; slots: Array<{ id: string; startTime: string; endTime: string }> }> = [];
       
       function isSlotOccupied(
@@ -166,6 +214,66 @@ serve(async (req) => {
             return true;
           }
         }
+        return false;
+      }
+      
+      function isSlotBlockedByException(
+        dateStr: string,
+        dayOfWeek: number,
+        slotStart: number,
+        slotEnd: number
+      ): boolean {
+        // Check specific date blocks
+        const dateBlocks = blockExceptionsByDate.get(dateStr) || [];
+        for (const block of dateBlocks) {
+          const blockStart = timeToMinutes(block.startTime);
+          const blockEnd = timeToMinutes(block.endTime);
+          // Check if slot overlaps with blocked interval
+          if (slotStart < blockEnd && slotEnd > blockStart) {
+            return true;
+          }
+        }
+        
+        // Check recurring day-of-week blocks
+        const dayBlocks = blockExceptionsByDayOfWeek.get(dayOfWeek) || [];
+        for (const block of dayBlocks) {
+          const blockStart = timeToMinutes(block.startTime);
+          const blockEnd = timeToMinutes(block.endTime);
+          if (slotStart < blockEnd && slotEnd > blockStart) {
+            return true;
+          }
+        }
+        
+        return false;
+      }
+      
+      function isSlotAllowedOnWeekend(
+        dateStr: string,
+        dayOfWeek: number,
+        slotStart: number,
+        slotEnd: number
+      ): boolean {
+        // Check specific date allows
+        const dateAllows = allowExceptionsByDate.get(dateStr) || [];
+        for (const allow of dateAllows) {
+          const allowStart = timeToMinutes(allow.startTime);
+          const allowEnd = timeToMinutes(allow.endTime);
+          // Slot must be fully within allowed interval
+          if (slotStart >= allowStart && slotEnd <= allowEnd) {
+            return true;
+          }
+        }
+        
+        // Check recurring day-of-week allows
+        const dayAllows = allowExceptionsByDayOfWeek.get(dayOfWeek) || [];
+        for (const allow of dayAllows) {
+          const allowStart = timeToMinutes(allow.startTime);
+          const allowEnd = timeToMinutes(allow.endTime);
+          if (slotStart >= allowStart && slotEnd <= allowEnd) {
+            return true;
+          }
+        }
+        
         return false;
       }
       
@@ -187,9 +295,24 @@ serve(async (req) => {
         const dayBookings = bookingsByDate.get(dateStr) || [];
         const slots: Array<{ id: string; startTime: string; endTime: string }> = [];
         
+        // Saturday: only allow if there's an allow exception
+        const isSaturday = dayOfWeek === 6;
+        
         // Generate slots every 30 minutes
         for (let start = workStartMinutes; start + serviceDuration <= workEndMinutes; start += 30) {
           const end = start + serviceDuration;
+          
+          // For Saturday, check if slot is explicitly allowed
+          if (isSaturday) {
+            if (!isSlotAllowedOnWeekend(dateStr, dayOfWeek, start, end)) {
+              continue; // Skip this slot - not allowed on Saturday
+            }
+          }
+          
+          // Check if slot is blocked by exception
+          if (isSlotBlockedByException(dateStr, dayOfWeek, start, end)) {
+            continue; // Skip blocked slot
+          }
           
           // Check if slot is available (not occupied by existing bookings)
           if (!isSlotOccupied(start, end, dayBookings)) {
@@ -903,6 +1026,31 @@ serve(async (req) => {
       const { error } = await supabaseAdmin
         .from('schedule_exceptions')
         .insert(body);
+      
+      if (error) throw error;
+      
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // PUT /admin/exceptions/:id - Update exception
+    if (path.match(/^\/admin\/exceptions\/[^/]+$/) && req.method === 'PUT') {
+      const exceptionId = path.split('/').pop();
+      const body = await req.json();
+      
+      const { error } = await supabaseAdmin
+        .from('schedule_exceptions')
+        .update({
+          start_time: body.start_time,
+          end_time: body.end_time,
+          exception_type: body.exception_type,
+          is_recurring: body.is_recurring,
+          description: body.description,
+          date: body.date,
+          day_of_week: body.day_of_week,
+        })
+        .eq('id', exceptionId);
       
       if (error) throw error;
       
