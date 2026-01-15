@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import { TimeSlot, BookingStep, CustomerFormData } from './types';
 import { useServices, Service } from '@/hooks/useServices';
 import { useCalendarAvailability } from '@/hooks/useCalendarAvailability';
+import { useCreateBooking, useCheckBlacklist } from '@/hooks/useBookings';
 
 import { BookingCalendar } from './BookingCalendar';
 import { TreatwellButton } from './TreatwellButton';
@@ -17,7 +18,10 @@ export const BookingSection = () => {
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<TimeSlot | null>(null);
-
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const createBooking = useCreateBooking();
+  const checkBlacklist = useCheckBlacklist();
   // Get real availability based on selected service
   const { data: availabilityData, isLoading: isLoadingAvailability } = useCalendarAvailability(
     selectedService?.duration || null
@@ -66,25 +70,54 @@ export const BookingSection = () => {
     setStep('time');
   };
 
-  const handleSubmitBooking = (formData: CustomerFormData) => {
-    // For now, just show success toast
-    // This will be connected to Airtable later
-    console.log('Booking submitted:', {
-      service: selectedService,
-      date: selectedDate,
-      timeSlot: selectedTimeSlot,
-      customer: formData,
-    });
+  const handleSubmitBooking = async (formData: CustomerFormData) => {
+    if (!selectedService || !selectedDate || !selectedTimeSlot) {
+      toast.error('Trūksta duomenų rezervacijai');
+      return;
+    }
     
-    toast.success('Rezervacija sėkmingai pateikta!', {
-      description: 'Su jumis susisieksime patvirtinti laiką.',
-    });
+    setIsSubmitting(true);
     
-    // Reset state
-    setStep('service');
-    setSelectedService(null);
-    setSelectedDate(null);
-    setSelectedTimeSlot(null);
+    try {
+      // Check if phone is blacklisted
+      const blacklistResult = await checkBlacklist.mutateAsync(formData.phone);
+      if (blacklistResult.isBlacklisted) {
+        toast.error('Atsiprašome, rezervacija negalima', {
+          description: 'Prašome susisiekti telefonu.',
+        });
+        setIsSubmitting(false);
+        return;
+      }
+      
+      // Create booking
+      await createBooking.mutateAsync({
+        serviceId: selectedService.id,
+        serviceDuration: selectedService.duration,
+        date: format(selectedDate, 'yyyy-MM-dd'),
+        startTime: selectedTimeSlot.startTime,
+        customerName: formData.fullName,
+        customerPhone: formData.phone,
+        customerEmail: formData.email || undefined,
+        promoCode: formData.promoCode || undefined,
+      });
+      
+      toast.success('Rezervacija sėkmingai pateikta!', {
+        description: 'Su jumis susisieksime patvirtinti laiką.',
+      });
+      
+      // Reset state
+      setStep('service');
+      setSelectedService(null);
+      setSelectedDate(null);
+      setSelectedTimeSlot(null);
+    } catch (error) {
+      console.error('Booking error:', error);
+      toast.error('Nepavyko sukurti rezervacijos', {
+        description: 'Bandykite dar kartą arba susisiekite telefonu.',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (isLoading) {
@@ -187,6 +220,7 @@ export const BookingSection = () => {
                     timeSlot={selectedTimeSlot}
                     onBack={handleBackToTime}
                     onSubmit={handleSubmitBooking}
+                    isSubmitting={isSubmitting}
                   />
                 )}
               </div>
