@@ -10,6 +10,7 @@ interface BookingFormProps {
   timeSlot: TimeSlot;
   onBack: () => void;
   onSubmit: (formData: CustomerFormData) => void;
+  isSubmitting?: boolean;
 }
 
 export const BookingForm = ({
@@ -18,6 +19,7 @@ export const BookingForm = ({
   timeSlot,
   onBack,
   onSubmit,
+  isSubmitting = false,
 }: BookingFormProps) => {
   const [formData, setFormData] = useState<CustomerFormData>({
     fullName: '',
@@ -179,15 +181,17 @@ export const BookingForm = ({
 
           <button
             type="submit"
+            disabled={isSubmitting}
             className={cn(
               'w-full py-4 mt-6 rounded-sm transition-all duration-300',
               'bg-booking-available text-booking-bg font-light text-lg',
               'hover:bg-booking-available/90',
               'focus:outline-none focus:ring-2 focus:ring-booking-available/50 focus:ring-offset-2 focus:ring-offset-booking-bg',
-              'min-h-[56px]'
+              'min-h-[56px]',
+              'disabled:opacity-50 disabled:cursor-not-allowed'
             )}
           >
-            Patvirtinti rezervaciją
+            {isSubmitting ? 'Siunčiama...' : 'Patvirtinti rezervaciją'}
           </button>
         </form>
 

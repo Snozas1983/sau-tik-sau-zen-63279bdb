@@ -294,12 +294,47 @@ serve(async (req) => {
     if (path === '/bookings' && req.method === 'POST') {
       const body = await req.json();
       
+      console.log('POST /bookings received:', { 
+        serviceId: body.serviceId,
+        date: body.date,
+        startTime: body.startTime,
+        customerName: body.customerName,
+      });
+      
+      // Look up service to get airtable_id (frontend sends UUID)
+      let serviceAirtableId = body.serviceId;
+      let serviceName = 'Masažas';
+      
+      // Check if serviceId is a UUID (not starting with 'rec')
+      if (!body.serviceId.startsWith('rec')) {
+        const { data: service, error: serviceError } = await supabaseAdmin
+          .from('services')
+          .select('airtable_id, name')
+          .eq('id', body.serviceId)
+          .single();
+        
+        if (serviceError || !service?.airtable_id) {
+          console.error('Service lookup failed:', serviceError, 'serviceId:', body.serviceId);
+          return new Response(JSON.stringify({ 
+            success: false, 
+            error: 'Invalid serviceId - service not found' 
+          }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        
+        serviceAirtableId = service.airtable_id;
+        serviceName = service.name;
+        console.log('Service lookup success:', { uuid: body.serviceId, airtableId: serviceAirtableId, name: serviceName });
+      }
+      
       const data = await airtableRequest('/Bookings', {
         method: 'POST',
         body: JSON.stringify({
           records: [{
             fields: {
-              'Service': [body.serviceId],
+              'Service': [serviceAirtableId],
               'Date': body.date,
               'Start Time': body.startTime,
               'End Time': body.endTime,
@@ -312,13 +347,8 @@ serve(async (req) => {
           }]
         }),
       });
-
-      // Get service name for notifications
-      const { data: serviceData } = await supabaseAdmin
-        .from('services')
-        .select('name')
-        .eq('airtable_id', body.serviceId)
-        .single();
+      
+      console.log('Airtable booking created:', data.records[0]?.id);
 
       // Send notifications asynchronously (don't wait for response)
       // Use the already-defined SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY from top of file
@@ -330,7 +360,7 @@ serve(async (req) => {
         },
         body: JSON.stringify({
           bookingId: data.records[0].id,
-          serviceName: serviceData?.name || 'Masažas',
+          serviceName: serviceName,
           date: body.date,
           startTime: body.startTime,
           endTime: body.endTime,
@@ -338,7 +368,9 @@ serve(async (req) => {
           customerPhone: body.customerPhone,
           customerEmail: body.customerEmail,
         }),
-      }).catch(err => console.error('Failed to send notifications:', err));
+      })
+        .then(res => console.log('send-notifications response status:', res.status))
+        .catch(err => console.error('Failed to send notifications:', err));
       
       return new Response(JSON.stringify({ success: true, booking: data.records[0] }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
