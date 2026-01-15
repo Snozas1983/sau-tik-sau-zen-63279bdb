@@ -595,7 +595,7 @@ serve(async (req) => {
       });
     }
 
-    // PUT /booking/:token - Update booking by token (cancel)
+    // PUT /booking/:token - Update booking by token (cancel or reschedule)
     if (path.match(/^\/booking\/[^/]+$/) && req.method === 'PUT') {
       const token = path.split('/').pop();
       const body = await req.json();
@@ -609,6 +609,29 @@ serve(async (req) => {
         if (error) {
           throw error;
         }
+        
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      if (body.action === 'reschedule') {
+        const updateData: Record<string, any> = {};
+        if (body.date) updateData.date = body.date;
+        if (body.startTime) updateData.start_time = body.startTime;
+        if (body.endTime) updateData.end_time = body.endTime;
+        
+        const { error } = await supabaseAdmin
+          .from('bookings')
+          .update(updateData)
+          .eq('manage_token', token);
+        
+        if (error) {
+          console.error('Reschedule error:', error);
+          throw error;
+        }
+        
+        console.log('Booking rescheduled:', token, updateData);
         
         return new Response(JSON.stringify({ success: true }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },

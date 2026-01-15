@@ -62,7 +62,6 @@ export function BookingFilters({
         <SelectContent>
           <SelectItem value="all">Visi statusai</SelectItem>
           <SelectItem value="confirmed">Patvirtinti</SelectItem>
-          <SelectItem value="completed">Atlikti</SelectItem>
           <SelectItem value="no_show">Neatvyko</SelectItem>
           <SelectItem value="cancelled">Atšaukti</SelectItem>
         </SelectContent>

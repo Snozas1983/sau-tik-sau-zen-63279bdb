@@ -28,14 +28,12 @@ interface BookingDetailDialogProps {
 
 const STATUS_OPTIONS = [
   { value: 'confirmed', label: 'Patvirtinta' },
-  { value: 'completed', label: 'Įvykdyta' },
   { value: 'no_show', label: 'Neatvyko' },
   { value: 'cancelled', label: 'Atšaukta' },
 ];
 
 const STATUS_COLORS: Record<string, string> = {
   confirmed: 'text-green-600',
-  completed: 'text-blue-600',
   cancelled: 'text-red-600',
   no_show: 'text-gray-600',
 };
@@ -51,7 +49,7 @@ export function BookingDetailDialog({
   if (!booking) return null;
 
   const formattedDate = format(parseISO(booking.date), 'EEEE, MMMM d', { locale: lt });
-  const isCancellable = booking.status !== 'cancelled' && booking.status !== 'completed';
+  const isCancellable = booking.status !== 'cancelled' && booking.status !== 'no_show';
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
