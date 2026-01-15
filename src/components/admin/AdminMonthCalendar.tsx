@@ -20,7 +20,6 @@ interface AdminMonthCalendarProps {
 
 const STATUS_COLORS: Record<string, string> = {
   confirmed: 'bg-green-500/20 text-green-700 border-green-500/40',
-  completed: 'bg-blue-500/20 text-blue-700 border-blue-500/40',
   cancelled: 'bg-red-500/20 text-red-700 border-red-500/40',
   no_show: 'bg-gray-500/20 text-gray-700 border-gray-500/40',
   blacklisted: 'bg-black/80 text-white border-black',

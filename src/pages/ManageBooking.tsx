@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { format, parseISO, addHours, isBefore } from 'date-fns';
 import { lt } from 'date-fns/locale';
@@ -17,6 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { ClientRescheduleDialog } from '@/components/booking/ClientRescheduleDialog';
 
 interface BookingDetails {
   id: string;
@@ -31,14 +32,12 @@ interface BookingDetails {
 
 const STATUS_LABELS: Record<string, string> = {
   confirmed: 'Patvirtinta',
-  completed: 'Įvykdyta',
   cancelled: 'Atšaukta',
   no_show: 'Neatvyko',
 };
 
 const STATUS_COLORS: Record<string, string> = {
   confirmed: 'bg-green-500/20 text-green-700',
-  completed: 'bg-blue-500/20 text-blue-700',
   cancelled: 'bg-red-500/20 text-red-700',
   no_show: 'bg-gray-500/20 text-gray-700',
 };
@@ -50,9 +49,19 @@ const ManageBooking = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [showRescheduleDialog, setShowRescheduleDialog] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [isRescheduling, setIsRescheduling] = useState(false);
 
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+
+  // Calculate service duration from booking times
+  const serviceDuration = useMemo(() => {
+    if (!booking) return 60;
+    const [startH, startM] = booking.startTime.split(':').map(Number);
+    const [endH, endM] = booking.endTime.split(':').map(Number);
+    return (endH * 60 + endM) - (startH * 60 + startM);
+  }, [booking]);
 
   useEffect(() => {
     const fetchBooking = async () => {
@@ -92,7 +101,7 @@ const ManageBooking = () => {
 
   const canModify = () => {
     if (!booking) return false;
-    if (booking.status === 'cancelled' || booking.status === 'completed' || booking.status === 'no_show') {
+    if (booking.status === 'cancelled' || booking.status === 'no_show') {
       return false;
     }
     
@@ -129,6 +138,40 @@ const ManageBooking = () => {
       toast.error('Klaida atšaukiant vizitą');
     } finally {
       setIsCancelling(false);
+    }
+  };
+
+  const handleReschedule = async (date: string, startTime: string, endTime: string) => {
+    if (!token) return;
+    
+    setIsRescheduling(true);
+    try {
+      const response = await fetch(
+        `${supabaseUrl}/functions/v1/airtable-proxy/booking/${token}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            action: 'reschedule', 
+            date, 
+            startTime, 
+            endTime 
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to reschedule');
+      }
+
+      toast.success('Vizitas perkeltas');
+      setBooking(prev => prev ? { ...prev, date, startTime, endTime } : null);
+      setShowRescheduleDialog(false);
+    } catch (err) {
+      console.error('Error rescheduling:', err);
+      toast.error('Klaida perkeliant vizitą');
+    } finally {
+      setIsRescheduling(false);
     }
   };
 
@@ -220,13 +263,13 @@ const ManageBooking = () => {
             {modifiable ? (
               <div className="pt-4 space-y-3">
                 <p className="text-sm text-muted-foreground">
-                  Galite atšaukti vizitą likus ne mažiau kaip {hoursRemaining} val.
+                  Galite perkelti arba atšaukti vizitą likus ne mažiau kaip {hoursRemaining} val.
                 </p>
                 <div className="flex flex-col gap-2">
                   <Button
                     variant="outline"
                     className="w-full"
-                    onClick={() => toast.info('Perkėlimo funkcija bus pridėta netrukus')}
+                    onClick={() => setShowRescheduleDialog(true)}
                   >
                     <CalendarClock className="mr-2 h-4 w-4" />
                     Perkelti vizitą
@@ -247,7 +290,7 @@ const ManageBooking = () => {
                   <p className="text-sm text-muted-foreground text-center">
                     Šis vizitas jau atšauktas.
                   </p>
-                ) : booking.status === 'completed' || booking.status === 'no_show' ? (
+                ) : booking.status === 'no_show' ? (
                   <p className="text-sm text-muted-foreground text-center">
                     Šis vizitas jau įvyko.
                   </p>
@@ -295,6 +338,17 @@ const ManageBooking = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Reschedule dialog */}
+      <ClientRescheduleDialog
+        open={showRescheduleDialog}
+        onClose={() => setShowRescheduleDialog(false)}
+        onConfirm={handleReschedule}
+        isLoading={isRescheduling}
+        currentDate={booking.date}
+        currentTime={booking.startTime}
+        serviceDuration={serviceDuration}
+      />
     </div>
   );
 };

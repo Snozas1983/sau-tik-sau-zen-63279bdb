@@ -13,14 +13,12 @@ interface BookingCardProps {
 
 const statusLabels: Record<string, string> = {
   confirmed: 'Patvirtinta',
-  completed: 'Atlikta',
   no_show: 'Neatvyko',
   cancelled: 'Atšaukta',
 };
 
 const statusColors: Record<string, string> = {
-  confirmed: 'bg-blue-500/20 text-blue-700',
-  completed: 'bg-green-500/20 text-green-700',
+  confirmed: 'bg-green-500/20 text-green-700',
   no_show: 'bg-red-500/20 text-red-700',
   cancelled: 'bg-muted text-muted-foreground',
 };
@@ -78,7 +76,6 @@ export function BookingCard({ booking, onStatusChange }: BookingCardProps) {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="confirmed">Patvirtinta</SelectItem>
-            <SelectItem value="completed">Atlikta</SelectItem>
             <SelectItem value="no_show">Neatvyko</SelectItem>
             <SelectItem value="cancelled">Atšaukta</SelectItem>
           </SelectContent>
