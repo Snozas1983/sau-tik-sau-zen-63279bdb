@@ -882,6 +882,58 @@ serve(async (req) => {
       });
     }
 
+    // GET /admin/clients - Get all clients with filters
+    if (path === '/admin/clients' && req.method === 'GET') {
+      const blacklistOnly = url.searchParams.get('blacklistOnly') === 'true';
+      const search = url.searchParams.get('search');
+      
+      let query = supabaseAdmin.from('clients').select('*');
+      
+      if (blacklistOnly) {
+        query = query.eq('is_blacklisted', true);
+      }
+      
+      if (search) {
+        query = query.or(`phone.ilike.%${search}%,name.ilike.%${search}%`);
+      }
+      
+      const { data, error } = await query.order('updated_at', { ascending: false });
+      
+      if (error) {
+        console.error('Error fetching clients:', error);
+        throw error;
+      }
+      
+      // Get booking counts for each client
+      const phones = (data || []).map((c: any) => c.phone);
+      const { data: bookingsData } = await supabaseAdmin
+        .from('bookings')
+        .select('customer_phone')
+        .in('customer_phone', phones);
+      
+      const bookingCounts = new Map<string, number>();
+      for (const b of bookingsData || []) {
+        const count = bookingCounts.get(b.customer_phone) || 0;
+        bookingCounts.set(b.customer_phone, count + 1);
+      }
+      
+      const clients = (data || []).map((record: any) => ({
+        id: record.id,
+        phone: record.phone,
+        name: record.name,
+        isBlacklisted: record.is_blacklisted,
+        blacklistReason: record.blacklist_reason,
+        noShowCount: record.no_show_count,
+        createdAt: record.created_at,
+        updatedAt: record.updated_at,
+        bookingsCount: bookingCounts.get(record.phone) || 0,
+      }));
+      
+      return new Response(JSON.stringify({ clients }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // GET /admin/services - Get all services (including inactive)
     if (path === '/admin/services' && req.method === 'GET') {
       console.log('Fetching all services from Supabase...');
