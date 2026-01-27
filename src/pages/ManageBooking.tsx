@@ -193,14 +193,20 @@ const ManageBooking = () => {
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
       {/* Logo */}
-      <div className="flex justify-center mb-6">
+      <div className="flex flex-col items-center mb-6">
         <a href="/">
           <img 
             src={logo} 
-            alt="SAU TIK SAU masažo studija" 
+            alt="SAU TIK SAU" 
             className="w-32 md:w-40"
           />
         </a>
+        <p 
+          className="text-sm text-muted-foreground tracking-[0.2em] mt-2 uppercase"
+          style={{ fontFamily: "'Montserrat', sans-serif" }}
+        >
+          Masažo studija
+        </p>
       </div>
       <Card className="w-full max-w-md">
           <CardHeader className="text-center">
@@ -229,14 +235,20 @@ const ManageBooking = () => {
     <div className="min-h-screen bg-background p-4">
       <div className="max-w-md mx-auto">
         {/* Logo */}
-        <div className="flex justify-center mb-6">
+        <div className="flex flex-col items-center mb-6">
           <a href="/">
             <img 
               src={logo} 
-              alt="SAU TIK SAU masažo studija" 
+              alt="SAU TIK SAU" 
               className="w-32 md:w-40"
             />
           </a>
+          <p 
+            className="text-sm text-muted-foreground tracking-[0.2em] mt-2 uppercase"
+            style={{ fontFamily: "'Montserrat', sans-serif" }}
+          >
+            Masažo studija
+          </p>
         </div>
 
         <Button
