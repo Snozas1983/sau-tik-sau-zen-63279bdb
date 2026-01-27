@@ -1,170 +1,118 @@
 
-# Planas: Dvikryptė Google Calendar sinchronizacija
+# Planas: Automatinė Google Calendar sinchronizacija kas 30 min (fone)
 
 ## Apžvalga
 
-Reikia sukurti pilną dvikryptę sinchronizaciją tarp Lovable rezervacijų sistemos ir Google Calendar "SAU TIK SAU". Tai apima:
-- Lovable rezervacijos automatiškai atsiranda Google Calendar
-- Google Calendar įvykiai automatiškai atsiranda Lovable kaip "užimtas laikas"
-- Atšaukimai abiejose sistemose sinchronizuojami
+Sukurti pilnai automatinę sinchronizaciją, kuri veiks serveryje nepriklausomai nuo to, ar atidaryta naršyklė.
 
 ---
 
-## Dabartinė situacija
+## Sprendimas
 
-| Funkcionalumas | Būsena |
-|----------------|--------|
-| Google OAuth prisijungimas | Veikia |
-| Sinchronizacija Lovable → Google | Dalinai (reikia integruoti į booking kūrimą) |
-| Sinchronizacija Google → Lovable | Neegzistuoja |
-| Webhook iš Google | Neegzistuoja |
+### 1. Modifikuoti `system-bookings` Edge funkciją
 
----
+**Failas:** `supabase/functions/system-bookings/index.ts`
 
-## Pakeitimai
-
-### 1. Automatinė sinchronizacija kuriant rezervacijas (Lovable → Google)
-
-**Failas:** `supabase/functions/airtable-proxy/index.ts`
-
-Po sėkmingo rezervacijos sukūrimo (eilutė ~576), iškviesti `sync-google-calendar` funkciją:
+Pridėti Google Calendar importo logiką funkcijos pabaigoje:
 
 ```typescript
-// Po newBooking sukūrimo ir prieš grąžinant response:
-if (newBooking && newBooking.status === 'confirmed') {
-  fetch(`${SUPABASE_URL}/functions/v1/sync-google-calendar`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-    },
-    body: JSON.stringify({
-      bookingId: newBooking.id,
-      action: 'create'
-    }),
-  }).catch(err => console.error('Google Calendar sync error:', err));
+// Pagrindinio darbo pabaigoje, prieš return:
+
+// Trigger Google Calendar import
+try {
+  const response = await fetch(
+    `${Deno.env.get('SUPABASE_URL')}/functions/v1/import-google-calendar`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+      }
+    }
+  );
+  
+  if (response.ok) {
+    const syncResult = await response.json();
+    actions.push(`Google Calendar sync: ${syncResult.created} imported, ${syncResult.deleted} removed`);
+  }
+} catch (err) {
+  console.error('Google Calendar sync error:', err);
 }
 ```
 
-### 2. Sinchronizacija atšaukiant/perkeliant rezervacijas
+### 2. Sukurti cron job kas 30 minučių
 
-**Failas:** `supabase/functions/airtable-proxy/index.ts`
-
-Atnaujinti admin booking update endpoint (~795-829 eilutės):
-- Jei `status` keičiamas į `cancelled` - ištrinti iš Google Calendar
-- Jei keičiasi data/laikas - atnaujinti Google Calendar
-
-### 3. Nauja Edge funkcija: `import-google-calendar`
-
-**Naujas failas:** `supabase/functions/import-google-calendar/index.ts`
-
-Ši funkcija:
-1. Nuskaito visus Google Calendar įvykius nurodytam laikotarpiui
-2. Palygina su esančiais Lovable įrašais (pagal `google_calendar_event_id`)
-3. Sukuria naujus sisteminius įrašus iš Google Calendar
-4. Ištrina Lovable sisteminius įrašus, kurių nebėra Google Calendar
-
-```typescript
-// Pagrindinė logika:
-async function importFromGoogleCalendar(accessToken, calendarId, supabase) {
-  // 1. Gauti įvykius iš Google Calendar (30 dienų į priekį)
-  const events = await fetchGoogleEvents(accessToken, calendarId);
-  
-  // 2. Gauti esamus sisteminius bookings su google_calendar_event_id
-  const existingBookings = await getExistingGoogleSyncedBookings(supabase);
-  
-  // 3. Sukurti naujus įrašus iš Google (kurių dar nėra Lovable)
-  for (const event of events) {
-    if (!existingBookings.has(event.id)) {
-      await createSystemBookingFromGoogleEvent(supabase, event);
-    }
-  }
-  
-  // 4. Ištrinti Lovable įrašus, kurių nebėra Google
-  for (const booking of existingBookings) {
-    if (!events.find(e => e.id === booking.google_calendar_event_id)) {
-      await deleteBooking(supabase, booking.id);
-    }
-  }
-}
-```
-
-### 4. Duomenų bazės pakeitimai
-
-Pridėti naują stulpelį `bookings` lentelėje importui sekti:
+**SQL komanda** (bus įvykdyta duomenų bazėje):
 
 ```sql
-ALTER TABLE bookings 
-ADD COLUMN IF NOT EXISTS google_calendar_source boolean DEFAULT false;
+SELECT cron.schedule(
+  'system-bookings-and-sync',
+  '*/30 * * * *',   -- Kas 30 minučių
+  $$
+  SELECT net.http_post(
+    url := 'https://gwjdijkbmesjoqmfepkc.supabase.co/functions/v1/system-bookings',
+    headers := '{"Content-Type": "application/json", "Authorization": "Bearer ANON_KEY"}'::jsonb,
+    body := '{"source": "cron"}'::jsonb
+  ) AS request_id;
+  $$
+);
 ```
-
-Tai padės atskirti:
-- `is_system_booking = true, google_calendar_source = false` - Lovable sisteminis
-- `is_system_booking = true, google_calendar_source = true` - Importuotas iš Google
-
-### 5. Periodinė sinchronizacija (Cron)
-
-Sukurti naują cron job, kuris kas 15 min paleidžia `import-google-calendar`:
-
-**Failas:** `supabase/config.toml` (jei palaikomas) arba naudoti išorinį cron servisą
-
-### 6. Admin UI papildymas
-
-**Failas:** `src/components/admin/SettingsTab.tsx`
-
-Pridėti mygtukus:
-- "Sinchronizuoti dabar" - rankiniu būdu paleisti importą
-- Rodyti paskutinės sinchronizacijos laiką
 
 ---
 
-## Techninė architektūra
+## Kaip tai veiks
 
 ```text
-+------------------+       +-------------------+       +------------------+
-|                  |       |                   |       |                  |
-|     Lovable      | <---> |   Edge Functions  | <---> | Google Calendar  |
-|   (bookings)     |       |                   |       |    (events)      |
-+------------------+       +-------------------+       +------------------+
-        |                          |
-        |                          |
-        v                          v
-   Naujas booking         sync-google-calendar
-   Atšaukimas             import-google-calendar
-   Perkėlimas
+┌─────────────────────────────────────────────────────────────────┐
+│                         SERVERIS                                │
+│                                                                 │
+│   ┌──────────┐     ┌───────────────────┐     ┌───────────────┐ │
+│   │ pg_cron  │────►│  system-bookings  │────►│ import-google │ │
+│   │ kas 30m  │     │  Edge Function    │     │    -calendar  │ │
+│   └──────────┘     └───────────────────┘     └───────────────┘ │
+│                            │                         │          │
+│                            ▼                         ▼          │
+│                    Sukuria/atšaukia          Importuoja iš      │
+│                    sistemos booking          Google Calendar    │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+       │
+       │  Veikia 24/7, nepriklausomai ar atidaryta naršyklė
+       ▼
 ```
 
-### Sinchronizacijos taisyklės
+---
 
-| Šaltinis | Veiksmas | Rezultatas |
-|----------|----------|------------|
-| Lovable: naujas booking (confirmed) | → | Sukuriamas Google Calendar event |
-| Lovable: booking atšauktas | → | Ištrinamas iš Google Calendar |
-| Lovable: booking perkeltas | → | Atnaujinamas Google Calendar event |
-| Google: naujas event | ← | Sukuriamas sisteminis booking |
-| Google: event ištrintas | ← | Ištrinamas sisteminis booking |
-| Google: event pakeistas | ← | Atnaujinamas sisteminis booking |
+## Privalumai
+
+| Aspektas | Nauda |
+|----------|-------|
+| Veikia fone | Nereikia atidaryti jokio puslapio |
+| Vienas cron job | Ir sistema, ir sinchronizacija veikia kartu |
+| Kas 30 min | Pakankamas dažnumas, nėra per daug užklausų |
+| Patikimumas | `pg_cron` yra stabilus ir veikia duomenų bazės lygyje |
 
 ---
 
-## Įgyvendinimo eiliškumas
+## Alternatyvos dėl kliento valdymo tokeno
 
-1. **Pirmas žingsnis**: Atnaujinti `airtable-proxy` - automatinis sync kuriant/keičiant rezervacijas
-2. **Antras žingsnis**: Sukurti `import-google-calendar` Edge funkciją
-3. **Trečias žingsnis**: Pridėti DB migracijas (`google_calendar_source` stulpelis)
-4. **Ketvirtas žingsnis**: Atnaujinti Admin UI su sinchronizacijos mygtuku
-5. **Penktas žingsnis**: Nustatyti periodinę sinchronizaciją
+Jūsų pasiūlytas variantas (paleisti sinchronizaciją kai klientas atidaro valdymo puslapį) **taip pat veiktų kaip papildomas triggeris**:
 
----
+**Failas:** `src/pages/ManageBooking.tsx`
 
-## Rizikos ir sprendimai
+Kai klientas užkrauna puslapį, galime "tyliai" paleisti sinchronizaciją fone:
 
-| Rizika | Sprendimas |
-|--------|------------|
-| Dublikatai | Tikrinti pagal `google_calendar_event_id` prieš kuriant |
-| Rate limits | Sinchronizuoti kas 15 min, ne realiu laiku |
-| Token galiojimas | Jau yra token refresh logika `sync-google-calendar` |
-| Konfliktai | Google Calendar yra "master" importuojamiems įvykiams |
+```typescript
+useEffect(() => {
+  // Trigger background sync when client opens management page
+  fetch(`${supabaseUrl}/functions/v1/import-google-calendar`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' }
+  }).catch(() => {}); // Ignore errors - this is optional
+}, []);
+```
+
+Tačiau tai būtų **papildomas** metodas, o **pagrindinis** turėtų būti `pg_cron` kas 30 min.
 
 ---
 
@@ -172,9 +120,15 @@ Pridėti mygtukus:
 
 | Failas | Veiksmas |
 |--------|----------|
-| `supabase/functions/airtable-proxy/index.ts` | Modifikuoti - pridėti auto-sync |
-| `supabase/functions/import-google-calendar/index.ts` | Sukurti naują |
-| `supabase/config.toml` | Modifikuoti - pridėti naują funkciją |
-| `src/components/admin/SettingsTab.tsx` | Modifikuoti - pridėti sync mygtuką |
-| `src/hooks/useGoogleCalendar.ts` | Modifikuoti - pridėti importo funkcijas |
-| DB migracija | Pridėti `google_calendar_source` stulpelį |
+| `supabase/functions/system-bookings/index.ts` | Modifikuoti - pridėti import-google-calendar iškvietimą |
+| Duomenų bazė (SQL) | Sukurti cron job |
+| `src/pages/ManageBooking.tsx` (neprivaloma) | Pridėti papildomą sync triggerį |
+
+---
+
+## Įgyvendinimo eiliškumas
+
+1. Atnaujinti `system-bookings` funkciją su Google Calendar sync logika
+2. Sukurti `pg_cron` job kas 30 minučių
+3. Testuoti ar veikia automatiškai
+
