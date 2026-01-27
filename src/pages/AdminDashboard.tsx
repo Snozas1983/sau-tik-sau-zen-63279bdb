@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Calendar, Settings, LogOut, List, Home, Bell, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
+import { useAutoGoogleSync } from '@/hooks/useAutoGoogleSync';
 import { CalendarTab } from '@/components/admin/CalendarTab';
 import { SettingsTab } from '@/components/admin/SettingsTab';
 import { ServicesTab } from '@/components/admin/ServicesTab';
@@ -44,6 +45,9 @@ const AdminDashboard = () => {
   }
   
   const adminPassword = getPassword();
+  
+  // Auto sync Google Calendar every 30 minutes
+  useAutoGoogleSync(adminPassword);
   
   return (
     <div className="min-h-screen bg-background flex flex-col">
