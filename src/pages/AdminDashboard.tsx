@@ -21,6 +21,11 @@ const AdminDashboard = () => {
   const { isAuthenticated, isLoading, logout, getPassword } = useAdminAuth();
   const navigate = useNavigate();
   
+  const adminPassword = getPassword();
+  
+  // Auto sync Google Calendar every 30 minutes - must be called unconditionally
+  useAutoGoogleSync(adminPassword);
+  
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       navigate('/admin');
@@ -43,11 +48,6 @@ const AdminDashboard = () => {
   if (!isAuthenticated) {
     return null;
   }
-  
-  const adminPassword = getPassword();
-  
-  // Auto sync Google Calendar every 30 minutes
-  useAutoGoogleSync(adminPassword);
   
   return (
     <div className="min-h-screen bg-background flex flex-col">
