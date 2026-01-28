@@ -1,17 +1,10 @@
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { getServiceAccountAccessToken, getCalendarId } from '../_shared/google-jwt.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-admin-password',
 };
-
-interface CalendarToken {
-  access_token: string;
-  refresh_token: string;
-  expires_at: string;
-  calendar_id: string;
-  id: string;
-}
 
 interface GoogleEvent {
   id: string;
@@ -28,56 +21,6 @@ interface GoogleEvent {
     timeZone?: string;
   };
   status: string;
-}
-
-// Refresh access token if expired
-async function getValidAccessToken(
-  supabase: SupabaseClient,
-  token: CalendarToken
-): Promise<string | null> {
-  const expiresAt = new Date(token.expires_at);
-  const now = new Date();
-
-  if (expiresAt.getTime() - now.getTime() > 5 * 60 * 1000) {
-    return token.access_token;
-  }
-
-  const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
-  const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET');
-
-  if (!clientId || !clientSecret) {
-    console.error('Google credentials not configured');
-    return null;
-  }
-
-  const response = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: clientId,
-      client_secret: clientSecret,
-      refresh_token: token.refresh_token,
-      grant_type: 'refresh_token'
-    })
-  });
-
-  const data = await response.json();
-
-  if (data.error) {
-    console.error('Token refresh error:', data);
-    return null;
-  }
-
-  const newExpiresAt = new Date(Date.now() + data.expires_in * 1000);
-  await supabase
-    .from('google_calendar_tokens')
-    .update({
-      access_token: data.access_token,
-      expires_at: newExpiresAt.toISOString()
-    })
-    .eq('id', token.id);
-
-  return data.access_token;
 }
 
 // Fetch events from Google Calendar
@@ -120,7 +63,6 @@ async function updateGoogleCalendarEvent(
 ): Promise<boolean> {
   const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${eventId}`;
   
-  // First get the existing event
   const getResponse = await fetch(url, {
     headers: { 'Authorization': `Bearer ${accessToken}` }
   });
@@ -129,7 +71,6 @@ async function updateGoogleCalendarEvent(
   
   const existingEvent = await getResponse.json();
   
-  // Update with new values
   const updatedEvent = {
     ...existingEvent,
     ...updates
@@ -149,10 +90,8 @@ async function updateGoogleCalendarEvent(
 
 // Parse Google event to get date and time
 function parseGoogleEvent(event: GoogleEvent): { date: string; startTime: string; endTime: string } | null {
-  // Skip cancelled events
   if (event.status === 'cancelled') return null;
 
-  // Handle dateTime events (specific time)
   if (event.start?.dateTime && event.end?.dateTime) {
     const start = new Date(event.start.dateTime);
     const end = new Date(event.end.dateTime);
@@ -164,7 +103,6 @@ function parseGoogleEvent(event: GoogleEvent): { date: string; startTime: string
     };
   }
 
-  // Handle all-day events - skip them as they don't have specific times
   if (event.start?.date) {
     return null;
   }
@@ -174,7 +112,6 @@ function parseGoogleEvent(event: GoogleEvent): { date: string; startTime: string
 
 // Get a dummy service ID for imported events
 async function getDummyServiceId(supabase: SupabaseClient): Promise<string> {
-  // Get the first active service
   const { data: services } = await supabase
     .from('services')
     .select('id')
@@ -185,7 +122,6 @@ async function getDummyServiceId(supabase: SupabaseClient): Promise<string> {
     return services[0].id;
   }
 
-  // Fallback: get any service
   const { data: anyService } = await supabase
     .from('services')
     .select('id')
@@ -209,7 +145,6 @@ Deno.serve(async (req) => {
     const storedPassword = Deno.env.get('ADMIN_PASSWORD');
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-    // Validate either admin password or service role key
     const isAdminAuth = adminPassword && adminPassword === storedPassword;
     const isServiceRoleAuth = authHeader && authHeader === `Bearer ${serviceRoleKey}`;
 
@@ -225,29 +160,18 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    // Get calendar token
-    const { data: tokens } = await supabase
-      .from('google_calendar_tokens')
-      .select('*')
-      .limit(1)
-      .maybeSingle();
+    // Get access token via Service Account JWT
+    const accessToken = await getServiceAccountAccessToken();
 
-    if (!tokens) {
+    if (!accessToken) {
       return new Response(
-        JSON.stringify({ error: 'Google Calendar not connected' }),
+        JSON.stringify({ error: 'Google Calendar not configured (Service Account)' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const tokenData = tokens as CalendarToken;
-    const accessToken = await getValidAccessToken(supabase, tokenData);
-
-    if (!accessToken) {
-      return new Response(
-        JSON.stringify({ error: 'Failed to get valid access token' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    // Get calendar ID from settings
+    const calendarId = await getCalendarId(supabase);
 
     // Define time range: today to 60 days ahead
     const now = new Date();
@@ -260,30 +184,20 @@ Deno.serve(async (req) => {
 
     console.log(`Fetching Google Calendar events from ${timeMin} to ${timeMax}`);
 
-    // Fetch events from Google Calendar
-    const calendarId = tokenData.calendar_id || 'primary';
     const googleEvents = await fetchGoogleCalendarEvents(accessToken, calendarId, timeMin, timeMax);
     
     console.log(`Found ${googleEvents.length} events in Google Calendar`);
 
-    // Filter out events created by Lovable (those will have specific naming)
-    // Events NOT created by Lovable = external events to import
     const externalEvents = googleEvents.filter(event => {
-      // Skip events that are already synced from Lovable
       const summary = event.summary || '';
-      // If it starts with STS - it's our event, skip
       if (summary.startsWith('STS ')) return false;
-      // Legacy: If it starts with [SISTEMA] it's from old Lovable system bookings
       if (summary.startsWith('[SISTEMA]')) return false;
-      // Legacy: If it looks like a customer booking "Name - Service", skip it
       if (summary.includes(' - ') && !summary.includes('@')) return false;
-      
       return true;
     });
 
     console.log(`${externalEvents.length} external events to process`);
 
-    // Get existing bookings that were imported from Google Calendar
     const { data: existingImported } = await supabase
       .from('bookings')
       .select('id, google_calendar_event_id')
@@ -302,7 +216,6 @@ Deno.serve(async (req) => {
         .map(b => [b.google_calendar_event_id, b.id])
     );
 
-    // Get a dummy service ID for imported events
     const dummyServiceId = await getDummyServiceId(supabase);
 
     const stats = {
@@ -312,7 +225,6 @@ Deno.serve(async (req) => {
       skipped: 0
     };
 
-    // Process each external event
     const googleEventIds = new Set<string>();
     
     for (const event of externalEvents) {
@@ -325,7 +237,6 @@ Deno.serve(async (req) => {
       googleEventIds.add(event.id);
 
       if (existingEventIds.has(event.id)) {
-        // Update existing booking
         const bookingId = existingBookingsMap.get(event.id);
         if (bookingId) {
           await supabase
@@ -339,7 +250,6 @@ Deno.serve(async (req) => {
           stats.updated++;
         }
       } else {
-        // Create new booking from Google event
         const { error: insertError } = await supabase
           .from('bookings')
           .insert({
@@ -363,7 +273,6 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Delete bookings that no longer exist in Google Calendar
     for (const [eventId, bookingId] of existingBookingsMap) {
       if (!googleEventIds.has(eventId)) {
         await supabase
@@ -374,12 +283,9 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Fix old events that don't have STS prefix
     const eventsNeedingUpdate = googleEvents.filter(event => {
       const summary = event.summary || '';
-      // If starts with [SISTEMA] - old format, needs update
       if (summary.startsWith('[SISTEMA]')) return true;
-      // If looks like our format "Name - Service" but no STS prefix
       if (summary.includes(' - ') && !summary.includes('@') && !summary.startsWith('STS ')) return true;
       return false;
     });
@@ -406,7 +312,6 @@ Deno.serve(async (req) => {
       console.log(`Fixed ${stsFixed} events with STS prefix`);
     }
 
-    // Update last sync timestamp in settings
     await supabase
       .from('settings')
       .upsert(

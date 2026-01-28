@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
-import { Save, Loader2, Shield, Calendar, Link2, Unlink, CheckCircle2, AlertCircle, Play, RefreshCw } from 'lucide-react';
+import { Save, Loader2, Shield, Calendar, CheckCircle2, AlertCircle, Play, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { TimeInput } from '@/components/ui/time-input';
@@ -46,10 +46,6 @@ export function SettingsTab({ adminPassword }: SettingsTabProps) {
   const { 
     status: googleStatus, 
     isLoading: isGoogleLoading, 
-    isConnecting,
-    connect: connectGoogle,
-    disconnect: disconnectGoogle,
-    isDisconnecting,
     importFromGoogle,
     isImporting
   } = useGoogleCalendar(adminPassword);
@@ -309,7 +305,7 @@ export function SettingsTab({ adminPassword }: SettingsTabProps) {
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-green-600" />
-                <span className="text-sm">Susietas</span>
+                <span className="text-sm">Susietas (Service Account)</span>
                 <Badge variant="secondary" className="text-xs">
                   {googleStatus.calendarId || 'primary'}
                 </Badge>
@@ -323,62 +319,35 @@ export function SettingsTab({ adminPassword }: SettingsTabProps) {
               )}
               
               {/* Sync button */}
-              <div className="flex flex-wrap gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => importFromGoogle()}
-                  disabled={isImporting}
-                >
-                  {isImporting ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                  )}
-                  Sinchronizuoti dabar
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  onClick={() => disconnectGoogle()}
-                  disabled={isDisconnecting}
-                  className="text-muted-foreground"
-                >
-                  {isDisconnecting ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <Unlink className="w-4 h-4 mr-2" />
-                  )}
-                  Atsijungti
-                </Button>
-              </div>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => importFromGoogle()}
+                disabled={isImporting}
+              >
+                {isImporting ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                )}
+                Sinchronizuoti dabar
+              </Button>
               
               <p className="text-xs text-muted-foreground">
                 • Lovable rezervacijos automatiškai atsiranda Google Calendar<br />
                 • Google Calendar įvykiai importuojami kaip užimti laikai<br />
-                • Atšauktos rezervacijos ištrinamos iš abiejų sistemų
+                • Atšauktos rezervacijos ištrinamos iš abiejų sistemų<br />
+                • Sinchronizacija vyksta automatiškai kas 30 min.
               </p>
             </div>
           ) : (
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-muted-foreground">
                 <AlertCircle className="w-4 h-4" />
-                <span className="text-sm">Nesusietas</span>
+                <span className="text-sm">Nesukonfigūruotas</span>
               </div>
-              <Button 
-                onClick={connectGoogle}
-                disabled={isConnecting}
-                size="sm"
-              >
-                {isConnecting ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <Link2 className="w-4 h-4 mr-2" />
-                )}
-                Susieti su Google Calendar
-              </Button>
               <p className="text-xs text-muted-foreground">
-                Prieš susiejant, administratorius turi sukonfigūruoti GOOGLE_CLIENT_ID ir GOOGLE_CLIENT_SECRET
+                Google Calendar integracija naudoja Service Account. Prašome susisiekti su administratoriumi dėl konfigūracijos.
               </p>
             </div>
           )}
