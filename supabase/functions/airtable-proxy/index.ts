@@ -1276,37 +1276,42 @@ serve(async (req) => {
       const body = await req.json().catch(() => ({}));
       
       if (body.action === 'google-calendar-status') {
-        const { data: tokens } = await supabaseAdmin
-          .from('google_calendar_tokens')
-          .select('calendar_id, expires_at')
-          .limit(1)
-          .maybeSingle();
+        // Check if Service Account is configured
+        const serviceAccountEmail = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_EMAIL');
+        const serviceAccountKey = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY');
         
-        // Get last sync timestamp from settings
+        // Get last sync timestamp and calendar ID from settings
         const settings = await getSettings();
         const lastSync = settings['google_calendar_last_sync'] || null;
+        const calendarId = settings['google_calendar_id'] || 'primary';
         
-        if (tokens) {
+        if (serviceAccountEmail && serviceAccountKey) {
+          // Service Account is configured - always connected
           return new Response(JSON.stringify({
             connected: true,
-            calendarId: tokens.calendar_id,
-            expiresAt: tokens.expires_at,
-            lastSync
+            calendarId: calendarId,
+            expiresAt: null, // Service Account tokens don't expire
+            lastSync,
+            authType: 'service_account'
           }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         } else {
+          // Service Account not configured
           return new Response(JSON.stringify({
             connected: false,
             calendarId: null,
             expiresAt: null,
-            lastSync: null
+            lastSync: null,
+            authType: null
           }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
       }
       
+      // Note: google-calendar-disconnect is no longer needed with Service Account
+      // but keeping for backwards compatibility (clears old OAuth tokens)
       if (body.action === 'google-calendar-disconnect') {
         await supabaseAdmin
           .from('google_calendar_tokens')

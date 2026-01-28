@@ -1,70 +1,10 @@
-import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { getServiceAccountAccessToken, getCalendarId } from '../_shared/google-jwt.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-interface CalendarToken {
-  access_token: string;
-  refresh_token: string;
-  expires_at: string;
-  calendar_id: string;
-  id: string;
-}
-
-// Refresh access token if expired
-async function getValidAccessToken(
-  supabase: SupabaseClient,
-  token: CalendarToken
-): Promise<string | null> {
-  const expiresAt = new Date(token.expires_at);
-  const now = new Date();
-
-  // If token is still valid (with 5 min buffer), return it
-  if (expiresAt.getTime() - now.getTime() > 5 * 60 * 1000) {
-    return token.access_token;
-  }
-
-  // Refresh the token
-  const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
-  const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET');
-
-  if (!clientId || !clientSecret) {
-    console.error('Google credentials not configured');
-    return null;
-  }
-
-  const response = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: clientId,
-      client_secret: clientSecret,
-      refresh_token: token.refresh_token,
-      grant_type: 'refresh_token'
-    })
-  });
-
-  const data = await response.json();
-
-  if (data.error) {
-    console.error('Token refresh error:', data);
-    return null;
-  }
-
-  // Update token in database
-  const newExpiresAt = new Date(Date.now() + data.expires_in * 1000);
-  await supabase
-    .from('google_calendar_tokens')
-    .update({
-      access_token: data.access_token,
-      expires_at: newExpiresAt.toISOString()
-    })
-    .eq('id', token.id);
-
-  return data.access_token;
-}
 
 // Create or update calendar event
 async function syncEventToCalendar(
@@ -176,29 +116,18 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    // Get calendar token
-    const { data: tokens } = await supabase
-      .from('google_calendar_tokens')
-      .select('*')
-      .limit(1)
-      .maybeSingle();
-
-    if (!tokens) {
+    // Get access token via Service Account JWT
+    const accessToken = await getServiceAccountAccessToken();
+    
+    if (!accessToken) {
       return new Response(
-        JSON.stringify({ message: 'Google Calendar not connected' }),
+        JSON.stringify({ message: 'Google Calendar not configured (Service Account)' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const tokenData = tokens as CalendarToken;
-    const accessToken = await getValidAccessToken(supabase, tokenData);
-    
-    if (!accessToken) {
-      return new Response(
-        JSON.stringify({ error: 'Failed to get valid access token' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    // Get calendar ID from settings
+    const calendarId = await getCalendarId(supabase);
 
     // Get booking details
     const { data: bookingData } = await supabase
@@ -237,7 +166,7 @@ Deno.serve(async (req) => {
 
     const eventId = await syncEventToCalendar(
       accessToken,
-      tokenData.calendar_id,
+      calendarId,
       bookingWithService,
       action
     );

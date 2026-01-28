@@ -8,6 +8,7 @@ interface GoogleCalendarStatus {
   calendarId: string | null;
   expiresAt: string | null;
   lastSync: string | null;
+  authType: 'service_account' | null;
 }
 
 interface ImportStats {
@@ -21,13 +22,11 @@ interface ImportStats {
 
 export function useGoogleCalendar(adminPassword: string) {
   const queryClient = useQueryClient();
-  const [isConnecting, setIsConnecting] = useState(false);
 
   // Check connection status
   const { data: status, isLoading } = useQuery({
     queryKey: ['google-calendar-status', adminPassword],
     queryFn: async (): Promise<GoogleCalendarStatus> => {
-      // We need to check via edge function since RLS blocks direct access
       const { data, error } = await supabase.functions.invoke('airtable-proxy', {
         body: { action: 'google-calendar-status' },
         headers: { 'x-admin-password': adminPassword }
@@ -37,49 +36,6 @@ export function useGoogleCalendar(adminPassword: string) {
       return data;
     },
     enabled: !!adminPassword,
-  });
-
-  // Connect to Google Calendar
-  const connect = useCallback(async () => {
-    setIsConnecting(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('google-calendar-auth', {
-        body: { adminPassword }
-      });
-
-      if (error) throw error;
-
-      if (data.authUrl) {
-        // Redirect to Google OAuth
-        window.location.href = data.authUrl;
-      } else if (data.error) {
-        toast.error(data.error);
-      }
-    } catch (error) {
-      console.error('Connect error:', error);
-      toast.error('Nepavyko prisijungti prie Google Calendar');
-    } finally {
-      setIsConnecting(false);
-    }
-  }, [adminPassword]);
-
-  // Disconnect from Google Calendar
-  const disconnectMutation = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase.functions.invoke('airtable-proxy', {
-        body: { action: 'google-calendar-disconnect' },
-        headers: { 'x-admin-password': adminPassword }
-      });
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['google-calendar-status'] });
-      toast.success('Google Calendar atsijungtas');
-    },
-    onError: () => {
-      toast.error('Klaida atsijungiant');
-    }
   });
 
   // Import from Google Calendar
@@ -128,10 +84,6 @@ export function useGoogleCalendar(adminPassword: string) {
   return {
     status,
     isLoading,
-    isConnecting,
-    connect,
-    disconnect: disconnectMutation.mutate,
-    isDisconnecting: disconnectMutation.isPending,
     syncBooking,
     importFromGoogle: importMutation.mutate,
     isImporting: importMutation.isPending
