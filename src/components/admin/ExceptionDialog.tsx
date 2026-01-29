@@ -289,9 +289,8 @@ export function ExceptionDialog({
             </div>
           )}
 
-          {/* Date range option - only for blocking, not weekends */}
-          {!isWeekend && (
-            <div className="space-y-3">
+          {/* Date range option */}
+          <div className="space-y-3">
               <div className="flex items-start gap-3">
                 <Checkbox
                   id="date-range"
@@ -341,11 +340,10 @@ export function ExceptionDialog({
                         className="p-3 pointer-events-auto"
                       />
                     </PopoverContent>
-                  </Popover>
-                </div>
-              )}
-            </div>
-          )}
+                </Popover>
+              </div>
+            )}
+          </div>
 
           {/* Recurring toggle - hidden when date range is selected */}
           {!isDateRange && (
