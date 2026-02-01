@@ -105,44 +105,45 @@ serve(async (req) => {
       
       console.log(`Generating calendar availability: duration=${serviceDuration}, daysAhead=${daysAhead}`);
       
-      // 1. Get settings for work hours
-      const settings = await getSettings();
-      const workStart = settings['work_start'] || '09:00';
-      const workEnd = settings['work_end'] || '18:00';
-      const breakBetween = parseInt(settings['break_between'] || '0');
-      
-      // 2. Calculate date range
+      // 1. Calculate date range first (needed for queries)
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       
       const maxDate = new Date(today);
       maxDate.setDate(maxDate.getDate() + daysAhead);
       
-      // 3. Get all bookings in this date range from Supabase
       const startDateStr = today.toISOString().split('T')[0];
       const endDateStr = maxDate.toISOString().split('T')[0];
       
-      const { data: bookingsData, error: bookingsError } = await supabaseAdmin
-        .from('bookings')
-        .select('date, start_time, end_time')
-        .gte('date', startDateStr)
-        .lte('date', endDateStr)
-        .eq('status', 'confirmed');
+      // 2. Run all queries in parallel for faster response
+      const [settings, bookingsResult, exceptionsResult] = await Promise.all([
+        getSettings(),
+        supabaseAdmin
+          .from('bookings')
+          .select('date, start_time, end_time')
+          .gte('date', startDateStr)
+          .lte('date', endDateStr)
+          .eq('status', 'confirmed'),
+        supabaseAdmin
+          .from('schedule_exceptions')
+          .select('*'),
+      ]);
       
-      if (bookingsError) {
-        console.error('Error fetching bookings:', bookingsError);
-        throw bookingsError;
+      if (bookingsResult.error) {
+        console.error('Error fetching bookings:', bookingsResult.error);
+        throw bookingsResult.error;
       }
       
-      // 4. Get schedule exceptions
-      const { data: exceptionsData, error: exceptionsError } = await supabaseAdmin
-        .from('schedule_exceptions')
-        .select('*');
-      
-      if (exceptionsError) {
-        console.error('Error fetching exceptions:', exceptionsError);
-        throw exceptionsError;
+      if (exceptionsResult.error) {
+        console.error('Error fetching exceptions:', exceptionsResult.error);
+        throw exceptionsResult.error;
       }
+      
+      const bookingsData = bookingsResult.data;
+      const exceptionsData = exceptionsResult.data;
+      const workStart = settings['work_start'] || '09:00';
+      const workEnd = settings['work_end'] || '18:00';
+      const breakBetween = parseInt(settings['break_between'] || '0');
       
       // Group exceptions by date and day of week
       const blockExceptionsByDate = new Map<string, Array<{ startTime: string; endTime: string }>>();
@@ -357,7 +358,11 @@ serve(async (req) => {
         availability,
         maxDate: endDateStr,
       }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json',
+          'Cache-Control': 'public, max-age=60, stale-while-revalidate=120',
+        },
       });
     }
 
