@@ -4,10 +4,11 @@ import heroBg from "@/assets/hero-bg.png";
 import { BookingSection } from "@/components/booking/BookingSection";
 import { AdminQuickPanel } from "@/components/admin/AdminQuickPanel";
 import { usePublicSettings } from "@/hooks/usePublicSettings";
-
 const Index = () => {
-  const { data: settings } = usePublicSettings();
-  
+  const {
+    data: settings
+  } = usePublicSettings();
+
   // Format phone for display (add spaces)
   const formatPhoneDisplay = (phone: string) => {
     if (!phone) return '+370 620 82478';
@@ -19,12 +20,10 @@ const Index = () => {
     }
     return phone;
   };
-  
   const contactPhone = settings?.contactPhone || '+37062082478';
   const contactPhoneDisplay = formatPhoneDisplay(contactPhone);
   const contactFacebook = settings?.contactFacebook || 'https://www.facebook.com/sautiksau';
   const contactInstagram = settings?.contactInstagram || 'https://www.instagram.com/sautiksaumasazas/';
-  
   return <div className="min-h-screen">
       {/* Hero Section */}
       <section className="relative min-h-screen flex flex-col items-center justify-center px-6 py-20 overflow-hidden">
@@ -62,9 +61,7 @@ const Index = () => {
       {/* Services & Booking Section */}
       <section className="py-16 md:py-32 px-4 md:px-6 border-t border-border bg-booking-bg">
         <div className="max-w-3xl mx-auto">
-          <h2 className="text-2xl md:text-4xl font-light text-center mb-8 md:mb-16 tracking-wide text-booking-foreground">
-            Paslaugos
-          </h2>
+          <h2 className="text-2xl md:text-4xl font-light text-center mb-8 md:mb-16 tracking-wide text-booking-foreground">Paslaugos.</h2>
           <BookingSection />
         </div>
       </section>
@@ -144,16 +141,12 @@ const Index = () => {
                 Socialiniai tinklai
               </p>
               <div className="flex justify-center gap-6">
-                {contactFacebook && (
-                  <a href={contactFacebook} className="text-lg font-light hover:text-muted-foreground transition-colors" target="_blank" rel="noopener noreferrer">
+                {contactFacebook && <a href={contactFacebook} className="text-lg font-light hover:text-muted-foreground transition-colors" target="_blank" rel="noopener noreferrer">
                     Facebook
-                  </a>
-                )}
-                {contactInstagram && (
-                  <a href={contactInstagram} className="text-lg font-light hover:text-muted-foreground transition-colors" target="_blank" rel="noopener noreferrer">
+                  </a>}
+                {contactInstagram && <a href={contactInstagram} className="text-lg font-light hover:text-muted-foreground transition-colors" target="_blank" rel="noopener noreferrer">
                     Instagram
-                  </a>
-                )}
+                  </a>}
               </div>
             </div>
           </div>
