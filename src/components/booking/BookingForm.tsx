@@ -23,7 +23,7 @@ export const BookingForm = ({
 }: BookingFormProps) => {
   const [formData, setFormData] = useState<CustomerFormData>({
     fullName: '',
-    phone: '',
+    phone: '+370 ',
     email: '',
     promoCode: '',
   });
@@ -36,11 +36,12 @@ export const BookingForm = ({
       newErrors.fullName = 'Prašome įvesti vardą ir pavardę';
     }
     
-    // Phone is now required
-    if (!formData.phone.trim()) {
+    // Phone is required and must be Lithuanian format
+    const phoneDigits = formData.phone.replace(/\s/g, '');
+    if (!formData.phone.trim() || formData.phone.trim() === '+370') {
       newErrors.phone = 'Prašome įvesti telefono numerį';
-    } else if (!/^[\d\s+()-]{6,}$/.test(formData.phone)) {
-      newErrors.phone = 'Neteisingas telefono formatas';
+    } else if (!/^\+370\d{8}$/.test(phoneDigits)) {
+      newErrors.phone = 'Įveskite Lietuvos telefono numerį (+370...)';
     }
     
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
@@ -63,6 +64,14 @@ export const BookingForm = ({
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: undefined }));
     }
+  };
+
+  const handlePhoneChange = (value: string) => {
+    // Ensure +370 prefix cannot be deleted
+    if (!value.startsWith('+370')) {
+      value = '+370 ' + value.replace(/^\+?3?7?0?\s?/, '');
+    }
+    handleChange('phone', value);
   };
 
   return (
@@ -98,7 +107,7 @@ export const BookingForm = ({
                   ? 'border-red-500/50'
                   : 'border-booking-border focus:border-booking-available/50'
               )}
-              placeholder="Jonas Jonaitis"
+              placeholder=""
             />
             {errors.fullName && (
               <p className="text-sm text-red-400">{errors.fullName}</p>
@@ -113,7 +122,7 @@ export const BookingForm = ({
               type="tel"
               id="phone"
               value={formData.phone}
-              onChange={(e) => handleChange('phone', e.target.value)}
+              onChange={(e) => handlePhoneChange(e.target.value)}
               className={cn(
                 'w-full px-4 py-3 rounded-sm bg-booking-surface border transition-colors',
                 'text-booking-foreground placeholder:text-booking-muted/50',
@@ -122,7 +131,7 @@ export const BookingForm = ({
                   ? 'border-red-500/50'
                   : 'border-booking-border focus:border-booking-available/50'
               )}
-              placeholder="+370 600 00000"
+              placeholder=""
             />
             {errors.phone && (
               <p className="text-sm text-red-400">{errors.phone}</p>
@@ -131,8 +140,7 @@ export const BookingForm = ({
 
           <div className="space-y-2">
             <label htmlFor="email" className="block text-sm text-booking-muted">
-              El. paštas{' '}
-              <span className="text-booking-muted/50">(neprivaloma)</span>
+              El. paštas
             </label>
             <input
               type="email"
@@ -147,7 +155,7 @@ export const BookingForm = ({
                   ? 'border-red-500/50'
                   : 'border-booking-border focus:border-booking-available/50'
               )}
-              placeholder="jonas@example.com"
+              placeholder=""
             />
             {errors.email && (
               <p className="text-sm text-red-400">{errors.email}</p>
@@ -159,8 +167,7 @@ export const BookingForm = ({
               htmlFor="promoCode"
               className="block text-sm text-booking-muted"
             >
-              Nuolaidos kodas{' '}
-              <span className="text-booking-muted/50">(neprivaloma)</span>
+              Nuolaidos kodas
             </label>
             <input
               type="text"
@@ -173,11 +180,8 @@ export const BookingForm = ({
                 'focus:outline-none focus:ring-2 focus:ring-booking-available/30',
                 'border-booking-border focus:border-booking-available/50'
               )}
-              placeholder="NUOLAIDA10"
+              placeholder=""
             />
-            <p className="text-xs text-booking-muted/60">
-              Jei turite nuolaidos kodą, įveskite jį čia
-            </p>
           </div>
 
           <button
