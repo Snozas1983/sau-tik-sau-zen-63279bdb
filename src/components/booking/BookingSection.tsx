@@ -6,7 +6,7 @@ import { useCalendarAvailability } from '@/hooks/useCalendarAvailability';
 import { useCreateBooking } from '@/hooks/useBookings';
 
 import { BookingCalendar } from './BookingCalendar';
-import { TreatwellButton } from './TreatwellButton';
+import { CalendarSkeleton } from './CalendarSkeleton';
 import { TimeSlotSelector } from './TimeSlotSelector';
 import { BookingForm } from './BookingForm';
 import { cn } from '@/lib/utils';
@@ -170,7 +170,7 @@ export const BookingSection = () => {
                 {/* Calendar */}
                 {step === 'calendar' && (
                   isLoadingAvailability ? (
-                    <div className="text-center py-8 text-booking-muted">Kraunama prieinamumas...</div>
+                    <CalendarSkeleton />
                   ) : (
                     <div className="space-y-6">
                       <BookingCalendar

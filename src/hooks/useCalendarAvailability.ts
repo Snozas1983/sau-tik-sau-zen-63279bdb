@@ -23,6 +23,6 @@ export function useCalendarAvailability(serviceDuration: number | null) {
       return data;
     },
     enabled: !!settings && serviceDuration !== null && serviceDuration > 0,
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 5 * 60 * 1000, // 5 minutes - longer cache for better performance
   });
 }
