@@ -1,68 +1,84 @@
 
 
-# Planas: Pataisyti "Kelios dienos" varnelės matomumą
+# Planas: Pridėti Supabase aplinkos kintamuosius į GitHub Actions
 
 ## Problema
-Vartotojas nemato "Kelios dienos (atostogos)" varnelės dialoge, kai paspaudžia ant kalendoriaus dienos. Mato tik "Kartoti kiekvieną savaitę".
-
-## Priežastis
-Dabartinėje implementacijoje "Kelios dienos" sekcija rodoma tik kai `!isWeekend` (eilutė 293). Tai reiškia:
-- Jei paspausite ant **pirmadienio-penktadienio** → Turėtų matyti abi varneles
-- Jei paspausite ant **šeštadienio/sekmadienio** → "Kelios dienos" varnelė PASLEPTA
+GitHub Actions workflow neturi Supabase aplinkos kintamųjų (`VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`), todėl `npm run build` sukuria aplikaciją be backend prisijungimo ir kalendorius neveikia.
 
 ## Sprendimas
-Pašalinti `!isWeekend` sąlygą, kad "Kelios dienos (atostogos)" varnelė būtų rodoma **visoms dienoms**, ne tik darbo dienoms. Tai leis kurti atostogų intervalus pradedant nuo bet kurios savaitės dienos.
 
-## Pakeitimai
+### 1 žingsnis: Pridėti GitHub Secrets (rankiniu būdu)
 
-### `src/components/admin/ExceptionDialog.tsx`
+Eik į GitHub → `Snozas1983/sautiksau2` → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**
 
-**Dabartinis kodas (eilutė 293):**
-```tsx
-{!isWeekend && (
-  <div className="space-y-3">
-    ...
-  </div>
-)}
-```
+Pridėk šiuos du secrets:
 
-**Naujas kodas:**
-```tsx
-<div className="space-y-3">
-  ...
-</div>
-```
+| Secret Name | Value |
+|-------------|-------|
+| `VITE_SUPABASE_URL` | `https://gwjdijkbmesjoqmfepkc.supabase.co` |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd3amRpamtibWVzam9xbWZlcGtjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjczNTQyMDEsImV4cCI6MjA4MjkzMDIwMX0.CuOukchqVf6Pq69FVYKsxTsZA2YavCAMVmsFLSnzw7E` |
 
-Tiesiog pašalinti `{!isWeekend && (...)}` apvalkalą, kad "Kelios dienos" sekcija būtų visada rodoma.
+### 2 žingsnis: Atnaujinti deploy.yml
 
-## UI po pakeitimo
+Pakeisti build žingsnį, kad naudotų aplinkos kintamuosius:
 
-```text
-+------------------------------------------+
-| Blokuoti laiką / Leisti registraciją      |
-| [Pasirinkta diena]                        |
-|                                           |
-| Visa diena: [ĮJUNGTA]                     |
-|                                           |
-| [x] Kelios dienos (atostogos)             |  ← VISADA RODOMA
-|     Iki: [📅 2026-02-14]                  |
-|                                           |
-| [ ] Kartoti kiekvieną savaitę             |
-|                                           |
-| Aprašymas: [________________]             |
-|                                           |
-| [Atšaukti]              [Sukurti]         |
-+------------------------------------------+
+```yaml
+- name: 📦 Instaliuojama ir gaminama (Build)
+  env:
+    VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+    VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+  run: |
+    npm install
+    npm run build
 ```
 
 ## Failų pakeitimai
 
 | Failas | Pakeitimas |
 |--------|------------|
-| `src/components/admin/ExceptionDialog.tsx` | Pašalinti `!isWeekend` sąlygą nuo "Kelios dienos" sekcijos (eilutė 293) |
+| `.github/workflows/deploy.yml` | Pridėti `env:` bloką su Supabase kintamaisiais prie build žingsnio (eilutės 18-21) |
+
+## Po pakeitimo
+
+```yaml
+name: Deploy Lovable Project
+on:
+  push:
+    branches:
+      - main
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🚚 Parsiunčiamas kodas
+        uses: actions/checkout@v4
+
+      - name: 🟢 Paruošiamas Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 📦 Instaliuojama ir gaminama (Build)
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          npm install
+          npm run build
+
+      - name: 📂 Keliama į Hostinger
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./dist/
+          server-dir: ./public_html/
+          dangerous-clean-slate: true
+```
 
 ## Rezultatas
-- "Kelios dienos (atostogos)" varnelė bus matoma paspaudus ant **bet kurios** kalendoriaus dienos
-- Galėsite pasirinkti pradžios dieną (paspaudę ant jos) ir pabaigos datą (su kalendoriaus picker)
-- Vienu įrašu užblokuosite visą atostogų periodą
+- Build procesas turės prieigą prie Supabase
+- Kalendorius ir visos funkcijos veiks Hostinger svetainėje
+- Po push į main, automatiškai bus įkelta nauja versija
 
